@@ -607,10 +607,9 @@ module Prog = struct
   type insert = loc * string 
 
   let insert ?loc src = 
-    (* REDO let stack = Printexc.get_callstack 2 in *)
+    let stack = Printexc.get_callstack 2 in
     let loc = match loc with 
-    | None -> `Loc ("", 0)
-        (* REDO parse_loc (Printexc.raw_backtrace_to_string stack) *)
+    | None -> parse_loc (Printexc.raw_backtrace_to_string stack)
     | Some loc -> loc 
     in
     loc, src
@@ -638,10 +637,9 @@ module Prog = struct
       srcs : (loc * string) list (* list is reversed *); }
 
   let shader ?lang ?loc ?(inserts = []) kind src =
-(* REDO let stack = Printexc.get_callstack 2 in  *)
+    let stack = Printexc.get_callstack 2 in
     let loc = match loc with
-    | None -> `Loc ("", 0)
-        (* parse_loc (Printexc.raw_backtrace_to_string stack)  *)
+    | None -> parse_loc (Printexc.raw_backtrace_to_string stack)
     | Some loc -> loc 
     in
     { kind; lang; srcs = (loc, src) :: (List.rev inserts) }
