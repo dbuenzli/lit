@@ -644,10 +644,8 @@ module Prog = struct
       mc
   | _ -> raise Exit 
 
-
-  
   let bind_uniforms r prog e =
-    let us = Prog.uniforms (Effect.prog e) in 
+    let us = Effect.uniforms e in 
     let m2w = lazy (M4.id) (* TODO *) in 
 (*    let next_active_tex = ref 0 in*)
     let bind_uniform name u = match Uniform.find_named us name with 

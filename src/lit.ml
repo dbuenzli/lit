@@ -707,14 +707,23 @@ end
 module Effect = struct  
   type t = 
     { prog : Prog.t; 
-      mutable info : Info.t } 
+      mutable uniforms : Uniform.set; 
+      mutable info : Info.t 
+} 
 
   type uniforms = int
 
   let create prog =
-    { prog; info = Info.none }
+    let uniforms = Prog.uniforms prog in 
+    { prog; uniforms; info = Info.none }
            
   let prog e = e.prog
+  let uniforms e = e.uniforms 
+  let get_uniform e u = Uniform.get e.uniforms u 
+  let set_uniform e u v = e.uniforms <- Uniform.def e.uniforms u v
+  
+  (* Renderer info *) 
+
   let info e = e.info 
   let set_info e i = e.info <- i
 end

@@ -745,8 +745,22 @@ module Effect : sig
 *)
 
   type t = effect
+  
   val create : prog -> effect   
+  (** [create prog] is an effect that uses the GPU program [prog]. *) 
+    
   val prog : effect -> prog
+  (** [prog e] is [e]'s GPU program. *) 
+
+  val uniforms : effect -> Uniform.set 
+  (** [uniforms e] the uniforms that are used with [e]'s program (initially
+      equal to [Prog.uniforms (prog e)]. *) 
+
+  val get_uniform : effect -> 'a uniform -> Uniform.value_untyped 
+  (** [get_uniform e u] is the value of uniform [u] in [e]. *) 
+
+  val set_uniform : effect -> 'a uniform -> 'a -> unit
+  (** [set_uniform e u v] sets the value of uniform [u] to [v] in [e]. *) 
 end
 
 (** {1 Rendering} *) 
