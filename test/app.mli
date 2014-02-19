@@ -76,14 +76,17 @@ type mouse =
   [ `Button of [ `Down | `Up ] * mouse_button * p2 
   | `Motion of p2 * v2 ]
 
-
 type ev = 
   [ `Env of env
   | `Tick of float 
   | `Key of key 
   | `Mouse of mouse 
   | `Text of string ]
-(** The type for events. *) 
+(** The type for events. 
+    {ul
+    {- `Tick t, according to confg.tick_hz. The value [t]
+        is monotonic time in s elapsed since the beginning from 
+        the program.}} *) 
 
 val text_ev : t -> bool 
 (** [text_ev a] is [true] if [`Text] events are delivered. *) 

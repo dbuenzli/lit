@@ -3,8 +3,8 @@ Lit — Lightweight OpenGL-based rendering engine for OCaml
 Release %%VERSION%%
 
 Lit is a lightweight OpenGL-based rendering engine for OCaml. It
-provides a thin abstraction to program GPUs with with OpenGL (3.X),
-OpenGL ES (2) or WebGL.
+provides a thin abstraction to program GPUs with OpenGL, OpenGL ES or
+WebGL.
 
 Lit depends on [gg][1]. The OpenGL 3.X, 4.X and ES 2 renderers depend
 on [tgls][2]. The WebGL renderer on [js_of_ocaml][3]. Lit and its
