@@ -1,0 +1,30 @@
+(*---------------------------------------------------------------------------
+   Copyright (c) 2007, Daniel C. Bünzli. All rights reserved.
+   Distributed under a BSD license, see ../../LICENSE.                  
+  ---------------------------------------------------------------------------*)
+
+#install_printer Buf.print;;
+let pr_buf ?pos ?len b = 
+    Buf.print_data Format.std_formatter ?pos ?len b;
+    Format.print_newline ()
+;;
+
+#install_printer Attr.print_format;;
+let pr_attr ?pos ?len a = 
+    Attr.print Format.std_formatter ?pos ?len a;
+    Format.print_newline ()
+;;
+
+#install_printer Index.print_format;;
+let pr_index ?pos ?len a = 
+  Index.print Format.std_formatter ?pos ?len a;
+  Format.print_newline ()
+;;
+
+#install_printer Image.print_format;;
+let pr_image ?x ?y ?z ?w ?h ?d i = 
+  Image.print Format.std_formatter ?x ?y ?z ?w ?h ?d i;
+  Format.print_newline ()
+;;
+
+#install_printer Tex.print;;

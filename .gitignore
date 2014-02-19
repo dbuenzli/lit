@@ -1,0 +1,10 @@
+_build
+tmp
+dist
+test/sinex.ml
+test/models
+*~
+\.\#*
+\#*#
+.DS_Store
+CLOCK.org

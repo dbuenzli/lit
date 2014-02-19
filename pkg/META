@@ -1,0 +1,75 @@
+version = "%%VERSION%%"
+description = "Lightweight OpenGL-based rendering engine for OCaml"
+requires = "gg"
+archive(byte) = "lit.cma"
+archive(byte, plugin) = "lit.cma"
+archive(native) = "lit.cmxa"
+archive(native, plugin) = "lit.cmxs"
+exists_if = "lit.cma"
+
+package "top" (
+ version = "%%VERSION%%"
+ description = "Toplevel module for Lit"
+ requires = "compiler-libs.toplevel"
+ archive(byte) = "lit_top.cma"
+ archive(byte, plugin) = "lit_top.cma"
+ archive(native) = "lit_top.cmxa"
+ archive(native, plugin) = "lit_top.cmxs"
+ exists_if = "lit_top.cma"
+)
+
+package "u" (
+  version = "%%VERSION%%"
+  requires = "lit"
+  description "Lit's utility module"
+  archive(byte) = "litu.cma"
+  archive(byte) = "litu.cma"
+  archive(byte, plugin) = "litu.cma"
+  archive(native) = "litu.cmxa"
+  archive(native, plugin) = "litu.cmxs"
+  exists_if = "litu.cma"
+)
+
+package "gl3" (
+  version = "%%VERSION%%"
+  description = "Lit's OpenGL 3.x backend"
+  requires = "lit tgls.tgl3"
+  archive(byte) = "lit_gl3.cma"
+  archive(byte, plugin) = "lit_gl3.cma"
+  archive(native) = "lit_gl3.cmxa"
+  archive(native, plugin) = "lit_gl3.cmxs"
+  exists_if = "lit_gl3.cma"
+)
+
+package "gl4" (
+  version = "%%VERSION%%"
+  description = "Lit's OpenGL 4.x backend"
+  requires = "lit tgls.tgl4"
+  archive(byte) = "lit_gl4.cma"
+  archive(byte, plugin) = "lit_gl4.cma"
+  archive(native) = "lit_gl4.cmxa"
+  archive(native, plugin) = "lit_gl4.cmxs"
+  exists_if = "lit_gl4.cma"
+)
+
+package "gles2" (
+  version = "%%VERSION%%"
+  description = "Lit's OpenGL ES 2.x backend"
+  requires = "lit tgls.tgles2"
+  archive(byte) = "lit_gles2.cma"
+  archive(byte, plugin) = "lit_gles2.cma"
+  archive(native) = "lit_gles2.cmxa"
+  archive(native, plugin) = "lit_gles2.cmxs"
+  exists_if = "lit_gles2.cma"
+)
+
+package "webgl" (
+  version = "%%VERSION%%"
+  description = "Lit's WebGL backend"
+  requires = "lit js_of_ocaml js_of_ocaml.syntax"
+  archive(byte) = "lit_webgl.cma"
+  archive(byte, plugin) = "lit_webgl.cma"
+  archive(native) = "lit_webgl.cmxa"
+  archive(native, plugin) = "lit_webgl.cmxs"
+  exists_if = "lit_webgl.cma"
+)

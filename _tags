@@ -1,0 +1,17 @@
+<**/*.{mli,ml}> : bin_annot, annot
+<tsdl> : include
+<src> : include
+<test> : include
+
+<src/lit.{mli,ml}> : package(gg)
+<src/lit{u,_}.{mli,ml}> : package(gg)
+
+
+<src/lit_gl3.{mli,ml}> : package(gg), package(tgls.tgl3)
+<src/lit_gl4.{mli,ml}> : package(gg), package(tgls.tgl4)
+<src/lit_gles2.{mli,ml}> : package(gg), package(tgls.tgles2)
+<src/lit_webgl.{mli,ml}> : package(gg), package(js_of_ocaml.syntax), \
+                           syntax(camlp4o)
+
+<test/*.{mli,ml,byte,native}> : package(gg), package(ctypes),\
+                              package(tsdl), package(tgls.tgl3)
