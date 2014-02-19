@@ -21,8 +21,7 @@ package "top" (
 package "u" (
   version = "%%VERSION%%"
   requires = "lit"
-  description "Lit's utility module"
-  archive(byte) = "litu.cma"
+  description = "Lit's utility module"
   archive(byte) = "litu.cma"
   archive(byte, plugin) = "litu.cma"
   archive(native) = "litu.cmxa"
