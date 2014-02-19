@@ -12,8 +12,6 @@
 open Gg
 open Lit
 
-let pp = Format.printf 
-
 let fullscreen () = (* two triangles covering the projection of clip space *) 
   let attrs =                                    
     let b = Ba.create Bigarray.float32 (4 * 3) in 
@@ -32,9 +30,10 @@ let fullscreen () = (* two triangles covering the projection of clip space *)
   in
   Prim.create ~index `Triangles attrs
 
+let time = Uniform.(u "time" (Float 0.))
 let program = 
-  let uset, _ = Uniform.(set empty @@ u "time" Time) in 
-  let uset, _ = Uniform.(set uset  @@ u "view_size" Viewport_size) in
+  let view_size = Uniform.(u "view_size" Viewport_size) in 
+  let uset = Uniform.(add (add empty time) view_size) in
   Prog.create ~uset [
     Prog.shader `Vertex "
     in vec3 vertex;
@@ -75,43 +74,37 @@ let program =
     }"
   ]
 
-
-let effect = 
-  Effect.create program 
-    
+let effect = Effect.create program 
 let op = { count = 1; effect; prim = fullscreen () } 
 
 (* Render *) 
          
-let size = V2.v 600. 400.
-let r = Renderer.create ~time:App.elapsed ~size (App.select_backend ()) 
-
 let view = View.create () 
-let draw () = 
+let draw r = 
   Renderer.set_view r view;
   Renderer.frame_begin r; 
   Renderer.frame_add r op;
   Renderer.frame_end r;
   ()
     
-let last = ref 0.
-let ev app e = match (e : App.ev) with
-| `Env `Init -> pp "@[%a@]@." Renderer.Cap.pp_gl_synopsis r; `Ok 
+let ev r app e = match (e : App.ev) with
+| `Env `Init -> Demo.show_start r; `Ok
+| `Env `Exit -> Renderer.release r; Demo.show_stop (); `Ok
 | `Env (`Resize size) -> Renderer.set_size r size; `Ok
-| `Env `Exit -> Renderer.release r; `Ok
-| `Tick t ->
-    let now = App.elapsed () in
-    let (), draw = App.time draw () in 
-    let (), swap = App.time App.update_surface app in 
-    Printf.printf "draw %4.0fdus + swap %4.0fus = %4.0fus dt:%4.0fus  \r%!"
-      (draw *. 1e6) (swap *. 1e6) ((swap +. draw) *. 1e6)
-      ((now -. !last) *. 1e6);
-    last := now;
+| `Tick now ->
+    Effect.set_uniform op.effect time now;
+    Demo.show_stats now draw r App.update_surface app;
     `Ok
 | _ -> `Ok 
 
-let app = App.create { App.default with App.size = size; tick_hz = 120; ev }
-let () = App.handle_run app
+let main () = 
+  let size = V2.v 600. 400. in
+  let r = Renderer.create ~time:App.elapsed ~size (App.select_backend ()) in
+  let ev = ev r in
+  let app = App.create { App.default with App.size = size; tick_hz = 60; ev } in
+  App.handle_run app 
+  
+let () = main ()
 
 
 (*---------------------------------------------------------------------------
