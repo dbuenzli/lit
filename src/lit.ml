@@ -810,56 +810,33 @@ module Renderer = struct
     let of_formatter ppf level msg = pp ppf "%a@." pp_msg msg 
   end
 
+  (* TODO remove that ? *) 
   module Stat = struct
     type t = 
-      { mutable frame_stamp : float;  (* start time of current frame. *) 
-        mutable frame_time : float;   (* duration of last frame. *) 
-        mutable max_frame_time : float;
-        mutable renderables : int;
-        mutable max_renderables : int;
+      { mutable ops : int;
+        mutable max_ops : int;
         mutable vertices : int; 
         mutable max_vertices : int;
         mutable faces : int; 
-        mutable max_faces : int;
-        mutable sample_stamp : float;     (* start time of sample *) 
-        mutable sample_frame_count : int; (* number of frames in sample *)
-        mutable frame_hz : int;           (* frame rate *) }
+        mutable max_faces : int; }
       
     let stats = 
-      { frame_stamp = 0.; 
-        frame_time = 0.; max_frame_time = -.max_float;
-        renderables = 0; max_renderables = min_int; 
-        vertices = 0; max_vertices = min_int;
-        faces = 0; max_faces = min_int; 
-        sample_stamp = 0.; 
-        sample_frame_count = 0; 
-        frame_hz = 0; }
+      { ops = 0; 
+        max_ops = 0; 
+        vertices = 0; 
+        max_vertices = 0; 
+        faces = 0; 
+        max_faces = 0; }
       
     let begin_stats stats now =
-      stats.frame_stamp <- now; 
-      stats.renderables <- 0;
+      stats.ops <- 0;
       stats.vertices <- 0;
       stats.faces <- 0
         
     let end_stats s now = 
-      s.frame_time <- now -. s.frame_stamp;
-      if s.frame_time > s.max_frame_time 
-      then s.max_frame_time <- s.frame_time;
-      if s.renderables > s.max_renderables 
-      then s.max_renderables <- s.renderables;
-      if s.vertices > s.max_vertices 
-      then s.max_vertices <- s.vertices; 
-      if s.faces > s.max_faces 
-      then s.max_faces <- s.faces; 
-      let sample_duration = now -. s.sample_stamp in
-      s.sample_frame_count <- s.sample_frame_count + 1; 
-      if sample_duration > 1000. then begin 
-        s.frame_hz <- 
-          Float.int_of_round 
-            (((float s.sample_frame_count) /. sample_duration) *. 1000.);
-        s.sample_frame_count <- 0; 
-        s.sample_stamp <- now;
-      end 
+      if s.ops > s.max_ops then s.max_ops <- s.ops;
+      if s.vertices > s.max_vertices then s.max_vertices <- s.vertices; 
+      if s.faces > s.max_faces then s.max_faces <- s.faces
   end
   
   module type T = sig

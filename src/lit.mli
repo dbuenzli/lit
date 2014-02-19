@@ -32,7 +32,10 @@ module Ba : sig
   val create : ('a, 'b) Bigarray.kind -> int -> ('a, 'b) bigarray 
   (** [create k count] is a bigarray of kind [k] with [count] scalars. *)
 
-  (** {1:get Getting} *) 
+  (** {1:get Getting} 
+
+      {b Warning} These functions are not very efficient. Use for 
+      prototyping only. *) 
 
   val get_v2 : (float, 'b) bigarray -> int -> v2 
   (** [get_v2 b i] is the [i]th to [i+1]th scalars of [b] as a vector. *) 
@@ -60,7 +63,10 @@ module Ba : sig
   val geti_3d : (int32, 'b) bigarray -> int -> (int * int * int) 
   (** [get_v3 b i] is the [i]th to [i+2]th scalars of [b]. *)
   
-  (** {1:set Setting} *) 
+  (** {1:set Setting} 
+
+      {b Warning} These functions are not very efficient. Use for 
+      prototyping only. *) 
 
   val set_v2 : (float, 'b) bigarray -> int -> v2 -> int
   (** [set_v2 b i v] is [(i + 2)] and sets the [i]th to [i+1]th scalars of [b] 
@@ -256,7 +262,6 @@ type attr
 
 type prim
 (** The type for primitives. *)
-
 
 (** Attributes. 
 
