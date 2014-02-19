@@ -99,7 +99,7 @@ let ev r app e = match (e : App.ev) with
 
 let main () = 
   let size = V2.v 600. 400. in
-  let r = Renderer.create ~time:App.elapsed ~size (App.select_backend ()) in
+  let r = Renderer.create ~size (App.select_backend ()) in
   let ev = ev r in
   let app = App.create { App.default with App.size = size; tick_hz = 60; ev } in
   App.handle_run app 

@@ -106,10 +106,8 @@ type t =
     mutable debug : bool;
     mutable log : Log.t; 
     mutable compiler_parser : Log.compiler_parser;
-    now : unit -> float;
     mutable view : view; 
     mutable size : size2;
-    mutable frame_stamp : float;
     mutable 
       batches : op list Imap.t; (* maps programs ids to rendering operations *) 
   }
@@ -542,7 +540,6 @@ module Prog = struct
 
   let resolve_builtin r m2w = function 
   | `Viewport_size -> `V2 r.size
-  | `Time -> `Float r.frame_stamp
   | `Model_to_world -> `M4 (Lazy.force m2w)
   | `Viewport_o -> 
       failwith "TODO"
@@ -801,7 +798,7 @@ let render_batch r id batch =
 
 let name = "Lit %%VERSION%% GL 3.x renderer"
 
-let create ?log_compiler_parser ~time log ~debug size = 
+let create ?log_compiler_parser log ~debug size = 
   let compiler_parser = match log_compiler_parser with 
   | None -> 
       (* Potentially we'd like to defer that decision in init () to recognise
@@ -811,9 +808,7 @@ let create ?log_compiler_parser ~time log ~debug size =
   in
   { init = false;
     debug; log; compiler_parser; 
-    now = time;
-    view = View.create (); 
-    frame_stamp = 0.;
+    view = View.create ();
     size; 
     batches = Imap.empty; }
 
@@ -827,8 +822,7 @@ let view r = r.view
 let set_view r v = r.view <- v
 
 let frame_begin r = 
-  if not r.init then (r.init <- true; init r); 
-  r.frame_stamp <- r.now ()
+  if not r.init then (r.init <- true; init r)
   
 let frame_add r op = match Prog.setup r (Effect.prog op.effect) with 
 | `Error -> () 

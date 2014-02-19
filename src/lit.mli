@@ -489,7 +489,6 @@ module Uniform : sig
     | World_to_clip : m4 value 
     | Viewport_o : v2 value
     | Viewport_size : v2 value
-    | Time : float value
 
   type builtin = 
     [ `Model_to_world 
@@ -499,8 +498,7 @@ module Uniform : sig
     | `World_to_view 
     | `World_to_clip 
     | `Viewport_o
-    | `Viewport_size 
-    | `Time ]
+    | `Viewport_size ]
   (** The type for built-in uniform values. *) 
 
   type value_untyped = 
@@ -913,8 +911,8 @@ module Renderer : sig
     type t 
     val name : string
     val create : 
-      ?log_compiler_parser:Log.compiler_parser -> 
-      time:(unit -> float) -> Log.t -> debug:bool -> size2 -> t
+      ?log_compiler_parser:Log.compiler_parser -> Log.t -> debug:bool -> 
+      size2 -> t
     val size : t -> size2
     val set_size : t -> size2 -> unit
     val view : t -> View.t 
@@ -945,8 +943,7 @@ module Renderer : sig
   (** The type for renderers. *)
 
   val create : ?log_compiler_parser:Log.compiler_parser -> 
-    ?time:(unit -> float) -> ?log:Log.t -> 
-    ?debug:bool -> size:size2 -> (module T) -> renderer
+    ?log:Log.t -> ?debug:bool -> size:size2 -> (module T) -> renderer
 
   val size : renderer -> size2
   val set_size : renderer -> size2 -> unit

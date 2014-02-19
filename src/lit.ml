@@ -450,7 +450,6 @@ module Uniform = struct
     | World_to_clip : m4 value 
     | Viewport_o : v2 value
     | Viewport_size : v2 value
-    | Time : float value
 
   type builtin = 
     [ `Model_to_world 
@@ -460,8 +459,7 @@ module Uniform = struct
     | `World_to_view 
     | `World_to_clip 
     | `Viewport_o
-    | `Viewport_size 
-    | `Time ]
+    | `Viewport_size ]
 
   let pp_builtin ppf b = pp ppf begin match b with 
     | `Model_to_world -> "model_to_world"
@@ -472,7 +470,6 @@ module Uniform = struct
     | `World_to_clip -> "world_to_clip"
     | `Viewport_o -> "viewport_o"
     | `Viewport_size -> "viewport_size"
-    | `Time -> "time"
     end
 
   type value_untyped = 
@@ -489,26 +486,25 @@ module Uniform = struct
     | `Builtin of builtin ]
 
   let untype : type a. a value -> value_untyped = function
-    | Bool b -> `Bool b
-    | Int i -> `Int i
-    | Float f -> `Float f
-    | V2 v -> `V2 v
-    | V3 v -> `V3 v
-    | V4 v -> `V4 v
-    | M2 m -> `M2 m
-    | M3 m -> `M3 m
-    | M4 m -> `M4 m
-    | Tex t -> `Tex t 
-    | Model_to_world -> `Builtin `Model_to_world
-    | Model_to_view -> `Builtin `Model_to_view
-    | Model_to_clip -> `Builtin `Model_to_clip
-    | Model_normal_to_view -> `Builtin `Model_normal_to_view
-    | World_to_view -> `Builtin `World_to_view
-    | World_to_clip -> `Builtin `World_to_clip
-    | Viewport_o -> `Builtin `Viewport_o
-    | Viewport_size -> `Builtin `Viewport_size
-    | Time -> `Builtin `Time
-
+  | Bool b -> `Bool b
+  | Int i -> `Int i
+  | Float f -> `Float f
+  | V2 v -> `V2 v
+  | V3 v -> `V3 v
+  | V4 v -> `V4 v
+  | M2 m -> `M2 m
+  | M3 m -> `M3 m
+  | M4 m -> `M4 m
+  | Tex t -> `Tex t 
+  | Model_to_world -> `Builtin `Model_to_world
+  | Model_to_view -> `Builtin `Model_to_view
+  | Model_to_clip -> `Builtin `Model_to_clip
+  | Model_normal_to_view -> `Builtin `Model_normal_to_view
+  | World_to_view -> `Builtin `World_to_view
+  | World_to_clip -> `Builtin `World_to_clip
+  | Viewport_o -> `Builtin `Viewport_o
+  | Viewport_size -> `Builtin `Viewport_size
+                       
   let untype_fun : type a. a value -> (a -> value_untyped) = function
   | Bool _ -> fun v -> `Bool v
   | Int _ -> fun v -> `Int v
@@ -528,7 +524,6 @@ module Uniform = struct
   | World_to_clip -> fun v -> `M4 v
   | Viewport_o -> fun v -> `V2 v 
   | Viewport_size -> fun v -> `V2 v 
-  | Time -> fun v -> `Float v
       
   let pp_value_untyped ppf = function 
   | `Bool b -> Format.pp_print_bool ppf b
@@ -708,10 +703,7 @@ module Effect = struct
   type t = 
     { prog : Prog.t; 
       mutable uniforms : Uniform.set; 
-      mutable info : Info.t 
-} 
-
-  type uniforms = int
+      mutable info : Info.t  } 
 
   let create prog =
     let uniforms = Prog.uniforms prog in 
@@ -724,7 +716,7 @@ module Effect = struct
   
   (* Renderer info *) 
 
-  let info e = e.info 
+  let info e = e.info
   let set_info e i = e.info <- i
 end
 
@@ -877,8 +869,8 @@ module Renderer = struct
     val name : string
 
     val create : 
-      ?log_compiler_parser:Log.compiler_parser -> 
-      time:(unit -> float) -> Log.t -> debug:bool -> size2 -> t
+      ?log_compiler_parser:Log.compiler_parser -> Log.t -> 
+      debug:bool -> size2 -> t
 
     val size : t -> size2
     val set_size : t -> size2 -> unit
@@ -909,10 +901,10 @@ module Renderer = struct
   type t = R : (module T with type t = 'a) * 'a -> t
     
   let stdlog = Log.of_formatter Format.err_formatter 
-  let create ?log_compiler_parser ?(time = fun _ -> 0.) ?(log = stdlog) 
-      ?(debug = false) ~size backend =
+  let create ?log_compiler_parser ?(log = stdlog) ?(debug = false) ~size 
+      backend =
     let module R = (val backend : T) in
-    let r = R.create ?log_compiler_parser ~time log ~debug size in
+    let r = R.create ?log_compiler_parser log ~debug size in
     R ((module R), r)
                                  
   let size (R ((module R), r)) = R.size r
