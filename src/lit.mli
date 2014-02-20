@@ -795,29 +795,36 @@ module Renderer : sig
 
   module Log : sig
 
-    (** {1 Compiler messages} *) 
+    (** {1 Shader compiler messages} *) 
 
     type compiler_msg = 
       [ `Msg of string | `Msg_loc of string * Prog.loc * string ]
-    (** The type for compiler messages. *) 
+    (** The type for shader compiler messages. *) 
 
     val pp_compiler_msg : Format.formatter -> compiler_msg -> unit 
     (** [pp_compiler_msg ppf m] prints an unspecified representation of [m]
         on [ppf]. *)
     
-    type compiler_parser = string -> 
+    type compiler_msg_parser = string -> 
       [ `Loc of string * int * int * string | `Unparsed of string  ]
-    (** The type for GPU compiler message parser. Parses a string into 
-        four parts: before the file number, the file number, the line number, 
-        after the line number. *) 
+    (** The type for shader compiler message parsers. Parses a line into
+        either:
+        {ul
+        {- [`Loc (before, file_id, line, after)], for error messages
+           with file (which are represented by numbers) and line locations.}
+        {- [`Unparsed msg] if no location can be parsed in the error 
+           message}} *)
                                 
-    val compiler_parser_default : compiler_parser
-    (** [compiler_parser_default] parses msg:int:int:msg or int:int:msg 
-        into [`Loc]. *)
- 
-    val compiler_parser_raw : compiler_parser
-    (** [compiler_parser_raw s] is always [`Unparsed], i.e. gets the 
-        the raw log. *)
+    val compiler_msg_parser_default : compiler_msg_parser
+    (** [compiler_parser_default] parses the following patterns into [`Loc]:
+        {ul
+        {- msg:int:int:msg}
+        {- int:int:msg}}
+        Otherwise returns [`Unparsed]. *)
+      
+    val compiler_msg_parser_raw : compiler_msg_parser
+    (** [compiler_parser_raw s] is always [`Unparsed]. This allows
+        to get the raw log.  *)
 
     (** {1 Renderer messages} *) 
 
@@ -827,7 +834,15 @@ module Renderer : sig
       | `Missing_attr of prim * string
       | `Unsupported_shaders of prog * Prog.shader list 
       | `Msg of string ]
-    (** The type for log messages. *) 
+    (** The type for log messages. 
+        {ul 
+        {- [`Compiler msgs] shader compilation log.} 
+        {- [`Linker msgs] GPU program linker log.} 
+        {- [`Missing_attr (prim, att)] primitive [prim] is missing an attribute
+           named [att]} 
+        {- [`Unsupported_shaders (prog, sl)] program [prog] is using 
+           shaders [sl] whose kind is unsupported by the OpenGL renderer.}
+        {- [`Msg msg] generic message TODO remove that ?.}} *)
 
     val pp_msg : Format.formatter -> msg -> unit 
     (** [pp_msg ppf m] prints an unspecified representation of [m] on 
@@ -842,7 +857,7 @@ module Renderer : sig
     (** The type for logs. *) 
 
     val of_formatter : Format.formatter -> t 
-    (** [of_formatter ppf] logs on [ppf]. *) 
+    (** [of_formatter ppf] is a log that outputs on [ppf]. *) 
   end
 
   (** Private functions for implementing renderers. 
@@ -904,7 +919,7 @@ module Renderer : sig
       include module type of Log 
       val split_string : char -> string -> string list 
       val lines : string -> string list           
-      val compiler_msg : string -> compiler_parser ->
+      val compiler_msg : string -> compiler_msg_parser ->
         (int * string) list -> [> `Compiler of compiler_msg list ]
     end
   end
@@ -916,7 +931,7 @@ module Renderer : sig
     type t 
     val name : string
     val create : 
-      ?log_compiler_parser:Log.compiler_parser -> Log.t -> debug:bool -> 
+      ?compiler_msg_parser:Log.compiler_msg_parser -> Log.t -> debug:bool -> 
       size2 -> t
     val size : t -> size2
     val set_size : t -> size2 -> unit
@@ -947,7 +962,7 @@ module Renderer : sig
   type t = renderer 
   (** The type for renderers. *)
 
-  val create : ?log_compiler_parser:Log.compiler_parser -> 
+  val create : ?compiler_msg_parser:Log.compiler_msg_parser -> 
     ?log:Log.t -> ?debug:bool -> size:size2 -> (module T) -> renderer
 
   val size : renderer -> size2

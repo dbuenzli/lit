@@ -105,7 +105,7 @@ type t =
   { mutable init : bool;
     mutable debug : bool;
     mutable log : Log.t; 
-    mutable compiler_parser : Log.compiler_parser;
+    mutable compiler_msg_parser : Log.compiler_msg_parser;
     mutable view : view; 
     mutable size : size2;
     mutable 
@@ -487,7 +487,7 @@ module Prog = struct
     
   let compiler_log_msg r sid file_id_map =
     let log = Gl_hi.get_shader_info_log sid in
-    Log.compiler_msg log r.compiler_parser file_id_map
+    Log.compiler_msg log r.compiler_msg_parser file_id_map
 
   let linker_log_msg r id = 
     let log = Gl_hi.get_program_info_log id in
@@ -798,16 +798,17 @@ let render_batch r id batch =
 
 let name = "Lit %%VERSION%% GL 3.x renderer"
 
-let create ?log_compiler_parser log ~debug size = 
-  let compiler_parser = match log_compiler_parser with 
+let create ?compiler_msg_parser log ~debug size = 
+  let compiler_msg_parser = match compiler_msg_parser with 
   | None -> 
-      (* Potentially we'd like to defer that decision in init () to recognise
-         drivers. *) 
-      Log.compiler_parser_default 
+      (* TODO Potentially we'd like to defer that decision in init () 
+         once we have an OpenGL context to recognise drivers and adapt the 
+         default to them. *) 
+      Log.compiler_msg_parser_default 
   | Some parser -> parser
   in
   { init = false;
-    debug; log; compiler_parser; 
+    debug; log; compiler_msg_parser; 
     view = View.create ();
     size; 
     batches = Imap.empty; }

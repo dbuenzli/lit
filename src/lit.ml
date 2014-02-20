@@ -748,10 +748,10 @@ module Renderer = struct
     |  `Msg m -> pp ppf "@[%s@]" m 
     |  `Msg_loc (t, loc, m) -> pp ppf "@[%s:%a: %s@]" t Prog.pp_loc loc m
 
-    type compiler_parser = string -> 
+    type compiler_msg_parser = string -> 
       [ `Loc of string * int * int * string | `Unparsed of string  ]
     
-    let compiler_parser_default l =
+    let compiler_msg_parser_default l =
       let locify l pre file line rest = 
         try
           let file = int_of_string (String.trim file) in 
@@ -764,7 +764,7 @@ module Renderer = struct
       | file :: line :: rest -> locify l "" file line rest 
       | _ -> `Unparsed l
 
-    let compiler_parser_raw s = `Unparsed s
+    let compiler_msg_parser_raw s = `Unparsed s
 
     let compiler_msg log parser file_id_map = 
       let lines = lines log in 
@@ -844,7 +844,7 @@ module Renderer = struct
     val name : string
 
     val create : 
-      ?log_compiler_parser:Log.compiler_parser -> Log.t -> 
+      ?compiler_msg_parser:Log.compiler_msg_parser -> Log.t -> 
       debug:bool -> size2 -> t
 
     val size : t -> size2
@@ -876,10 +876,10 @@ module Renderer = struct
   type t = R : (module T with type t = 'a) * 'a -> t
     
   let stdlog = Log.of_formatter Format.err_formatter 
-  let create ?log_compiler_parser ?(log = stdlog) ?(debug = false) ~size 
+  let create ?compiler_msg_parser ?(log = stdlog) ?(debug = false) ~size 
       backend =
     let module R = (val backend : T) in
-    let r = R.create ?log_compiler_parser log ~debug size in
+    let r = R.create ?compiler_msg_parser log ~debug size in
     R ((module R), r)
                                  
   let size (R ((module R), r)) = R.size r
