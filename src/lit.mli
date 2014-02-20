@@ -471,29 +471,80 @@ end
 
 (** Uniforms. *) 
 module Uniform : sig
+  
+  (** {1 Uniforms} *)
+
+  type 'a t = 'a uniform
+  (** The type for uniforms. *)
+
+  val name : 'a t -> string 
+  (** [name u] is the name of uniform [u]. *) 
+
+  val value : 'a t -> 'a
+  (** [value u] is the value of uniform [u]. 
+
+      {b Note} Returns the zero of ['a] if [u] is a builtin. *)
+
+  val set_value : 'a t -> 'a -> 'a t
+  val set_to_model_to_world : m4 t -> m4 t 
+  (** TODO add the rest *)
+
+  val is_value_builtin : 'a uniform -> bool 
+  (** [is_value_builtin u] is [true] if [u] has its value 
+      defined by the renderer. *) 
+
+  val pp : Format.formatter -> 'a uniform -> unit 
+  (** [pp ppf u] prints an unspecified representation of [u] on [ppf]. *)
+
+  (** {1 Uniform constructors} 
+
+      TODO something must be said about GLSL ivec bvec etc. *) 
+ 
+  val bool : string -> bool -> bool uniform
+  (** [bool n v] is a boolean uniform named [n] with value [v]. *) 
+
+  val int : string -> int -> int uniform 
+  (** [int n v] is a integer uniform named [n] with value [v]. *) 
+
+  val float : string -> float -> float uniform 
+  (** [float n v] is a float uniform named [n] with value [v]. *) 
+
+  val v2 : string -> v2 -> v2 uniform 
+  (** [v2 n v] is a 2D vector uniform named [n] with value [v]. *) 
+
+  val v3 : string -> v3 -> v3 uniform 
+  (** [v3 n v] is a 3D vector uniform named [n] with value [v]. *) 
+
+  val v4 : string -> v4 -> v4 uniform 
+  (** [v4 n v] is a 4D vector uniform named [n] with value [v]. *) 
+
+  val m2 : string -> m2 -> m2 uniform
+  (** [m2 n v] is a 2x2 matrix uniform named [n] with value [v]. *) 
+
+  val m3 : string -> m3 -> m3 uniform
+  (** [m3 n v] is a 3x3 matrix uniform named [n] with value [v]. *) 
+
+  val m4 : string -> m4 -> m4 uniform
+  (** [m4 n v] is a 4x4 matrix uniform named [n] with value [v]. *) 
+
+  val tex : string -> tex -> tex uniform
+  (** [tex n v] is a sampler uniform named [n] with value [v]. *) 
+
+  (** {2 Constructors for special uniform values}
+      
+      Those uniforms have their value automatically setup 
+      by the renderer according to TODO. *)
+
+  val model_to_world : string -> m4 uniform 
+  val model_to_view : string -> m4 uniform 
+  val model_to_clip : string -> m4 uniform 
+  val model_normal_to_view : string -> m4 uniform 
+  val world_to_view : string -> m4 uniform 
+  val world_to_clip : string -> m4 uniform 
+  val viewport_o : string -> v2 uniform 
+  val viewport_size : string -> v2 uniform 
 
   (** {1 Uniform values} *) 
-
-  (** The type for typed uniform values. *)
-  type 'a value = 
-    | Bool : bool -> bool value
-    | Int : int -> int value 
-    | Float : float -> float value
-    | V2 : v2 -> v2 value 
-    | V3 : v3 -> v3 value 
-    | V4 : v4 -> v4 value 
-    | M2 : m2 -> m2 value
-    | M3 : m3 -> m3 value
-    | M4 : m4 -> m4 value
-    | Tex : tex -> tex value
-    | Model_to_world : m4 value
-    | Model_to_view : m4 value 
-    | Model_to_clip : m4 value 
-    | Model_normal_to_view : m4 value 
-    | World_to_view : m4 value
-    | World_to_clip : m4 value 
-    | Viewport_o : v2 value
-    | Viewport_size : v2 value
 
   type builtin = 
     [ `Model_to_world 
@@ -519,23 +570,6 @@ module Uniform : sig
     | `Tex of tex
     | `Builtin of builtin ]
    (** The type for untyped uniform values. *) 
-  
-  (** {1 Uniforms} *) 
-
-  type 'a t = 'a uniform
-  (** The type for uniforms. *)
-
-  val u : string -> 'a value -> 'a uniform
-  (** [u name v] is a uniform named [name] whose initial value is [v]. *) 
-
-  val name : 'a t -> string 
-  (** [name u] is the name of uniform [u]. *) 
-
-  val value : 'a t -> 'a value 
-  (** [value u] is the value of uniform [u]. *) 
-
-  val pp : Format.formatter -> 'a uniform -> unit 
-  (** [pp ppf u] prints an unspecified representation of [u] on [ppf]. *)
 
   (** {1 Uniform sets} *)
 
@@ -550,18 +584,6 @@ module Uniform : sig
   
   val add : set -> 'a uniform -> set 
   (** [add s u] is [s] with [u] added. *) 
-  
-  val set : set -> 'a uniform -> set * 'a uniform
-  (** [set s u] is [(s', u)] where [s'] is [s] with [u] added. *) 
-
-  val def : set -> 'a uniform -> 'a -> set
-  (** [def s u v] is [s] with [u] having value [v]. *)
-
-  val def_v : set -> 'a uniform -> 'a value -> set
-  (** [def_v s u v] is [s] with [u] having value [v]. *) 
-
-  val def_named : set -> string -> value_untyped -> set
-  (** [def_named s n v] is [s] with a uniform named [n] having value [v]. *)
 
   val mem_named : set -> string -> bool 
   (** [mem_named s n] is true if [s] has a uniform named [n]. *)
@@ -769,9 +791,9 @@ end
 (** {1 Rendering} *) 
 
 type view
-(** The type for rendered views. *)
+(** The type for rendered view volumes. *)
 
-(** Views 
+(** View volumes.
 
     A view defines a viewing volume in space, the view's background 
     color and the rectangular portion of the renderer's target it will render

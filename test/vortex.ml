@@ -30,9 +30,9 @@ let fullscreen () = (* two triangles covering the projection of clip space *)
   in
   Prim.create ~index `Triangles attrs
 
-let time = Uniform.(u "time" (Float 0.))
+let time = Uniform.float "time" 0.
 let program = 
-  let view_size = Uniform.(u "view_size" Viewport_size) in 
+  let view_size = Uniform.viewport_size "view_size" in 
   let uset = Uniform.(add (add empty time) view_size) in
   Prog.create ~uset [
     Prog.shader `Vertex "

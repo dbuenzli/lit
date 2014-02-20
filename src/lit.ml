@@ -29,7 +29,7 @@ let err_prim_not_uint t = str "index's scalar type not unsigned integer (%s)" t
 let err_prim_attr_dup n = str "attribute %s specified more than once" n
 
 let err_miss_uniform k = str "no uniform %s" k
-
+let err_uniform_value_builtin n v = str "uniform %s has builtin value %s" n v
 (* Renderer ids. *) 
 
 module Id = struct
@@ -544,8 +544,79 @@ module Uniform = struct
 
   let u name v = name, v, (untype_fun v)
   let name (n, _, _) = n 
-  let value (_, v, _) = v
+  
+  let value : type a. a t -> a = fun (n, v, _) -> match v with 
+  | Bool v -> v | Int v -> v | Float v -> v 
+  | V2 v -> v | V3 v -> v | V4 v -> v 
+  | M2 v -> v | M3 v -> v | M4 v -> v 
+  | Tex v -> v 
+  | Model_to_world -> M4.zero
+  | Model_to_view -> M4.zero
+  | Model_to_clip -> M4.zero
+  | Model_normal_to_view -> M4.zero
+  | World_to_view -> M4.zero
+  | World_to_clip -> M4.zero
+  | Viewport_o -> P2.o
+  | Viewport_size -> V2.zero
+
+  let set_value : type a. a t -> a -> a t = fun (n, t, inj) v -> match t with 
+  | Bool _ -> (n, Bool v, inj)
+  | Int _ -> (n, Int v, inj)
+  | Float _ -> (n, Float v, inj)
+  | V2 _ -> (n, V2 v, inj)
+  | V3 _ -> (n, V3 v, inj)
+  | V4 _ -> (n, V4 v, inj)
+  | M2 _ -> (n, M2 v, inj)
+  | M3 _ -> (n, M3 v, inj)
+  | M4 _ -> (n, M4 v, inj)
+  | Tex _ -> (n, Tex v, inj)
+  | Model_to_world -> (n, M4 v, inj)
+  | Model_to_view -> (n, M4 v, inj)
+  | Model_to_clip -> (n, M4 v, inj)
+  | Model_normal_to_view -> (n, M4 v, inj)
+  | World_to_view -> (n, M4 v, inj)
+  | World_to_clip -> (n, M4 v, inj)
+  | Viewport_o -> (n, V2 v, inj)
+  | Viewport_size -> (n, V2 v, inj)
+
+  let set_to_model_to_world (n, t, inj) = (n, Model_to_world, inj)
+
+  let is_value_builtin : type a. a t -> bool = fun (_, v, _) -> match v with 
+  | Model_to_world -> true 
+  | Model_to_view -> true 
+  | Model_to_clip -> true 
+  | Model_normal_to_view -> true
+  | World_to_view -> true 
+  | World_to_clip -> true
+  | Viewport_o -> true
+  | Viewport_size -> true 
+  | Bool _ -> false | Int _ -> false | Float _ -> false 
+  | V2 _ -> false | V3 _ -> false | V4 _ -> false 
+  | M2 _ -> false | M3 _ -> false | M4 _ -> false
+  | Tex _ -> false
+
   let pp ppf (n, v, _) = pp ppf "@[<1>%s =@ %a]" n pp_value_untyped (untype v)
+
+  let bool n v = let v = Bool v in (n, v, untype_fun v)
+  let int n v = let v = Int v in (n, v, untype_fun v)
+  let float n v = let v = Float v in (n, v, untype_fun v)
+  let v2 n v = let v = V2 v in (n, v, untype_fun v)
+  let v3 n v = let v = V3 v in (n, v, untype_fun v)
+  let v4 n v = let v = V4 v in (n, v, untype_fun v)
+  let m2 n v = let v = M2 v in (n, v, untype_fun v)
+  let m3 n v = let v = M3 v in (n, v, untype_fun v)
+  let m4 n v = let v = M4 v in (n, v, untype_fun v)
+  let tex n v = let v = Tex v in (n, v, untype_fun v)
+  let model_to_world n = let v = Model_to_world in (n, v, untype_fun v)
+  let model_to_clip n = let v = Model_to_clip in (n, v, untype_fun v)
+  let model_to_view n = let v = Model_to_view in (n, v, untype_fun v)
+  let model_normal_to_view n = 
+    let v = Model_normal_to_view in (n, v, untype_fun v)
+
+  let world_to_view n = let v = World_to_view in (n, v, untype_fun v)
+  let world_to_clip n = let v = World_to_clip in (n, v, untype_fun v)
+  let viewport_o n = let v = Viewport_o in (n, v, untype_fun v)
+  let viewport_size n = let v = Viewport_size in (n, v, untype_fun v)
 
   (* Uniform sets *)
 
@@ -557,7 +628,7 @@ module Uniform = struct
   let is_empty = Smap.is_empty
   let add s (n, v, _) = Smap.add n (untype v) s   
   let set s u = add s u, u
-  let def s (n, _, inj) v = Smap.add n (inj v) s
+  let def s (n, v, inj) v = Smap.add n (inj v) s
   let def_v s (n, _, _) v = Smap.add n (untype v) s
   let def_named s n v = Smap.add n v s
   let mem_named s n = Smap.mem n s 
