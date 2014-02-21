@@ -26,7 +26,7 @@ let err_attr_dim dim = str "invalid attribute dimension %d" dim
 let err_no_cpu_buffer = str "no cpu buffer" 
 let err_ba_kind kind = str "unsupported bigarray kind for Lit.Buf" 
 let err_ba_kind_mismatch exp = 
-  str "bigarray kind mismatch expected kind for %s" exp
+  str "bigarray kind mismatch expected kind for %s" exp (* TODO found: ba *)
 
 let err_prim_underspec = str "one of ?index or ?count must be specified"
 let err_prim_not_uint t = str "index's scalar type not unsigned integer (%s)" t
@@ -124,17 +124,6 @@ module Buf = struct
     
   let pp_scalar_type ppf st = pp ppf "%s" (scalar_type_to_string st)
 
-  let scalar_type_to_bigarray_kind : scalar_type -> ('a, 'b) Bigarray.kind = 
-    function (* FIXME *) 
-    | `UInt8 -> Obj.magic (Bigarray.int8_unsigned)
-    | `Int8 -> Obj.magic (Bigarray.int8_signed)
-    | `UInt16 -> Obj.magic (Bigarray.int16_unsigned)
-    | `Int16 -> Obj.magic (Bigarray.int16_signed)
-    | `UInt32 -> Obj.magic (Bigarray.int32)
-    | `Int32 -> Obj.magic (Bigarray.int32)
-    | `Float32 -> Obj.magic (Bigarray.float32)
-    | `Float64 -> Obj.magic (Bigarray.float64)
-
   let scalar_type_of_bigarray_kind : 
     ?unsigned:bool -> ('a, 'b) Bigarray.kind -> scalar_type option = 
     fun ?(unsigned = false) k -> 
@@ -169,12 +158,22 @@ module Buf = struct
     | `Dynamic_copy -> "dynamic_copy"
     end
       
+  type bigarray_any = Ba : ('a, 'b) bigarray -> bigarray_any
+
+  let create_bigarray_any scalar_type count = match scalar_type with
+  | `UInt8 -> Ba (Ba.create Bigarray.int8_unsigned count)
+  | `Int8 -> Ba (Ba.create Bigarray.int8_signed count) 
+  | `UInt16 -> Ba (Ba.create Bigarray.int16_unsigned count)
+  | `Int16 -> Ba (Ba.create Bigarray.int16_signed count)
+  | `UInt32 -> Ba (Ba.create Bigarray.int32 count)
+  | `Int32 -> Ba (Ba.create Bigarray.int32 count)
+  | `Float32 -> Ba (Ba.create Bigarray.float32 count)
+  | `Float64 -> Ba (Ba.create Bigarray.float64 count)
+
   type ('a, 'b) init = 
     [ `Cpu of scalar_type * int
     | `Bigarray of ('a, 'b) bigarray
     | `Gpu of scalar_type * int ]
-
-  type bigarray_any = Ba : ('a, 'b) bigarray -> bigarray_any
 
   type t = 
     { usage : usage; 
@@ -190,9 +189,7 @@ module Buf = struct
       ?(usage = `Static_draw) init = 
     match init with 
     | `Cpu (scalar_type, cpu_count) -> 
-        let kind = scalar_type_to_bigarray_kind scalar_type in
-        let ba = Ba.create kind cpu_count in
-        let cpu = Some (Ba ba) in
+        let cpu = Some (create_bigarray_any scalar_type cpu_count) in
         { usage; scalar_type;
           gpu_count = 0; gpu_exists = false; gpu_upload = true; 
           cpu_autorelease; cpu; info = Info.none }
@@ -245,15 +242,21 @@ module Buf = struct
     | None -> None
     | Some (Ba ba) -> Some (Obj.magic ba) (* FIXME, not fixable ? *) 
 
+  let check_kind b k = 
+    let mismatch () = 
+      let st = scalar_type_to_string b.scalar_type in
+      invalid_arg (err_ba_kind_mismatch st) 
+    in
+    let unsigned = b.scalar_type = `UInt32 in
+    match scalar_type_of_bigarray_kind ~unsigned k with 
+    | None -> mismatch () 
+    | Some st -> if b.scalar_type <> st then mismatch ()
+
   let set_cpu b = function 
   | None -> b.cpu <- None
   | Some ba -> 
-      let st = b.scalar_type in
-      let k = scalar_type_to_bigarray_kind b.scalar_type in
-      let k' = Bigarray.Array1.kind ba in 
-      if k <> k'
-      then invalid_arg (err_ba_kind_mismatch (scalar_type_to_string st))
-      else b.cpu <- Some (Ba ba)
+      check_kind b (Bigarray.Array1.kind ba); 
+      b.cpu <- Some (Ba ba)
 
   let cpu_autorelease b = b.cpu_autorelease
   let set_cpu_autorelease b bool = b.cpu_autorelease <- bool
@@ -264,11 +267,6 @@ module Buf = struct
     pp ppf "@[<1><buf %a %s/%s (gpu/cpu) %a>@]" 
       pp_scalar_type b.scalar_type gpu cpu pp_usage b.usage 
 
-  let check_kind b k = 
-    let k' = scalar_type_to_bigarray_kind b.scalar_type in 
-    if k = Obj.magic k' (* FIXME *) then () else 
-    let st = scalar_type_to_string b.scalar_type in 
-    invalid_arg (err_ba_kind_mismatch st)
       
   (* Renderer info *) 
 
