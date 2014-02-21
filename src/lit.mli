@@ -122,9 +122,6 @@ module Buf : sig
   val scalar_type_byte_count : scalar_type -> int
   (** [scalar_type_byte_count st] is the number of bytes used by [st]. *) 
 
-  val scalar_type_to_bigarray_kind : scalar_type -> ('a, 'b) Bigarray.kind
-  (** [scalar_type_to_bigarray_kind st] is the bigarray kind of [st] *)
-
   val scalar_type_of_bigarray_kind : ?unsigned:bool -> 
     ('a, 'b) Bigarray.kind -> scalar_type option
   (** [scalar_type_of_bigarray_kind k] is the scalar type of [k] (if any). 
