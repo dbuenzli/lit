@@ -100,9 +100,9 @@ end
 
 module Buf = struct
 
-  (* FIXME: this module is full of Obj.magic, it should be possible
-     to eliminate most of them once we have GADTs for bigarray kinds. 
-     http://caml.inria.fr/mantis/view.php?id=6064 *) 
+  (* FIXME: this module has three uses of Obj.magic. It will be 
+     possible to eliminate all of them once we have GADTs for bigarray 
+     kinds. http://caml.inria.fr/mantis/view.php?id=6064 *) 
 
   (* Scalar types *) 
   
@@ -237,11 +237,7 @@ module Buf = struct
         let st = scalar_type_to_string b.scalar_type in 
         invalid_arg (err_ba_kind_mismatch st)
 
-  let cpu_p : t -> ('a, 'b) bigarray option = 
-    fun b -> match b.cpu with 
-    | None -> None
-    | Some (Ba ba) -> Some (Obj.magic ba) (* FIXME, not fixable ? *) 
-
+  let cpu_p b = b.cpu
   let check_kind b k = 
     let mismatch () = 
       let st = scalar_type_to_string b.scalar_type in
@@ -267,7 +263,6 @@ module Buf = struct
     pp ppf "@[<1><buf %a %s/%s (gpu/cpu) %a>@]" 
       pp_scalar_type b.scalar_type gpu cpu pp_usage b.usage 
 
-      
   (* Renderer info *) 
 
   let info b = b.info 

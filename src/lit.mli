@@ -998,10 +998,11 @@ module Renderer : sig
 
     module Buf : sig
       include module type of Buf
+      type bigarray_any = Ba : ('a, 'b) bigarray -> bigarray_any
       val set_gpu_count : buf -> int -> unit 
       val set_gpu_exists : buf -> bool -> unit
       val cpu_byte_count : buf -> int 
-      val cpu_p : buf -> ('a, 'b) bigarray option
+      val cpu_p : buf -> bigarray_any option
       val check_kind : buf -> ('a, 'b) Bigarray.kind -> unit
       val info : buf -> Info.t
       val set_info : buf -> Info.t -> unit

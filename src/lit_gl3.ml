@@ -203,11 +203,13 @@ module Buf = struct
         info.id
     in
     let usage = enum_of_usage (Buf.usage b) in
-    let byte_count = cpu_byte_count b in  
-    let cpu = cpu_p b in 
+    let byte_count = cpu_byte_count b in
     Gl.bind_buffer Gl.array_buffer id; 
     Gl.buffer_data Gl.array_buffer 0 None usage; (* mark buffer as unused. *) 
-    Gl.buffer_data Gl.array_buffer byte_count cpu usage;
+    begin match cpu_p b with 
+    | None -> Gl.buffer_data Gl.array_buffer byte_count None usage
+    | Some (Ba ba) -> Gl.buffer_data Gl.array_buffer byte_count (Some ba) usage
+    end;
     Gl.bind_buffer Gl.array_buffer 0; 
     set_gpu_count b (Buf.cpu_count b);
     set_gpu_exists b true;
