@@ -14,6 +14,10 @@ let rec pp_list ?(pp_sep = Format.pp_print_cut) pp_v ppf = function
 | v :: vs ->
     pp_v ppf v; if vs <> [] then (pp_sep ppf (); pp_list ~pp_sep pp_v ppf vs)
 
+let to_string_of_formatter pp v =                        (* NOT thread safe. *)
+  Format.fprintf Format.str_formatter "%a" pp v; 
+  Format.flush_str_formatter ()
+
 (* Invalid argument strings *) 
 
 let err_miss_key n k = str "no %s %s" n k
@@ -331,7 +335,9 @@ module Prim = struct
     | `Triangles_adjacency -> "triangles_adjacency"
     | `Triangle_strip_adjacency -> "triangle_strip_adjacency"
     end
-      
+
+  let kind_to_string v = to_string_of_formatter pp_kind v
+ 
   (* Primitives *) 
       
   module Smap = Map.Make(String) 

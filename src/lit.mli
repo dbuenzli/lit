@@ -359,6 +359,9 @@ module Prim : sig
   (** The kind of primitive. Defines how the vertex stream is
       interpreted. *)
 
+  val kind_to_string : kind -> string 
+  (** [to_string kind] is an unspecified textual representation of [kind]. *)
+  
   val pp_kind : Format.formatter -> kind -> unit 
   (** [pp_kind ppf kind] prints an unspecified representation of [kind]
       on [ppf]. *) 
@@ -1150,9 +1153,11 @@ module Renderer : sig
 
 end
 
-(** {1 Relationship to OpenGL contexts} 
+(** {1 Remarks and tips} 
 
     {ul 
+    {- [to_string] functions are not thread-safe. Thread-safety can 
+       be achieved with [pp] functions.}
     {- For now, [Buf.t], [Geom.t] and [Effect] value should not be shared
        across renderers.}
     {- Note about OpenGL ids represented as [int]s.}} *) 
