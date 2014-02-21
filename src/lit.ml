@@ -374,7 +374,8 @@ module Prim = struct
   let name p = p.name 
   let index p = p.index
   let first p = p.first
-  let count p = match p.count with 
+  let count p = p.count
+  let count_now p = match p.count with 
   | Some count -> count
   | None ->
       match p.index with
@@ -409,7 +410,7 @@ module Prim = struct
       pp ppf ",@ @[%a@]" (pp_list ~pp_sep pp_attr) attrs
     in
     pp ppf "@[<1><prim %s %a%a%a@ %dvs%a%a>@]"
-      p.name pp_kind p.kind pp_tr p.tr pp_first p.first (count p) 
+      p.name pp_kind p.kind pp_tr p.tr pp_first p.first (count_now p) 
       pp_index p.index pp_attrs (attrs p)
 
   (* Renderer info *) 

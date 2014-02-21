@@ -411,8 +411,12 @@ module Prim : sig
   val first : prim -> int
   (** [first p] is first scalar index read from [index]. See {!create}. *) 
 
-  val count : prim -> int
-  (** [count p] is the number of vertices in the vertex stream. 
+  val count : prim -> int option 
+  (** [cout p] is the [count] of [p] as specified at primitive creation. 
+      See also {!count_now}. *)
+ 
+  val count_now : prim -> int
+  (** [count_now p] is the number of vertices in the vertex stream. 
       If [count] was specified at creation time, this is always that
       number. Otherwise, let [b] be {!Prim.index}[ p] and [first] 
       be {!Prim.first}[ p]:

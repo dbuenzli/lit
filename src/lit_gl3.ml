@@ -774,7 +774,7 @@ let render_op r prog_info op =
   | None -> 
       let prim_info = Prim.get_info op.prim in
       let first = Prim.first op.prim in 
-      let count = Prim.count op.prim in
+      let count = Prim.count_now op.prim in
       let mode = prim_info.Prim.kind in
       if op.count = 1
       then Gl.draw_arrays mode first count
@@ -783,7 +783,7 @@ let render_op r prog_info op =
       let prim_info = Prim.get_info op.prim in 
       let index_info = Buf.get_info index in
       let first = `Offset (Prim.first op.prim) in 
-      let count = Prim.count op.prim in 
+      let count = Prim.count_now op.prim in 
       let mode = prim_info.Prim.kind in
       let type_ = index_info.Buf.scalar_type in
       if op.count = 1
