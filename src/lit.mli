@@ -226,6 +226,9 @@ module Buf : sig
   val cpu_count : buf -> int
   (** [cpu_count b] is the number of scalars in the CPU buffer of [b]. *)
 
+  val cpu_exists : buf -> bool 
+  (** [cpu_exists b] is [true] if the CPU buffer of [b] exists. *) 
+
   val cpu : buf -> ('a, 'b) Bigarray.kind -> ('a, 'b) bigarray option
   (** [cpu b kind] is the CPU buffer of [b] (if any).
       

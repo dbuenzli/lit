@@ -224,6 +224,7 @@ module Buf = struct
   let cpu_count b = match b.cpu with 
   | None -> 0 | Some (Ba ba) -> Bigarray.Array1.dim ba 
 
+  let cpu_exists b = b.cpu <> None
   let cpu_byte_count b = match b.cpu with 
   | None -> 0 
   | Some (Ba ba) -> 
