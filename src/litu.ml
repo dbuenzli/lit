@@ -209,11 +209,11 @@ module Effects = struct
   
   module Wireframe = struct
 
-    let model_to_clip = Uniform.(u "model_to_clip" Model_to_clip) 
-    let fill_color = Uniform.(u "fill_color" (V4 Color.white))
-    let wire_color = Uniform.(u "wire_color" (V4 Color.black))
-    let wire_width = Uniform.(u "wire_width" (Float 1.0))
-    let wire_only = Uniform.(u "wire_only" (Bool false))
+    let model_to_clip = Uniform.model_to_clip "model_to_clip" 
+    let fill_color = Uniform.v4 "fill_color" Color.white
+    let wire_color = Uniform.v4 "wire_color" Color.black
+    let wire_width = Uniform.float "wire_width" 1.
+    let wire_only = Uniform.bool "wire_only" false
 
     let create ?fill_color ?wire_color ?wire_width ?wire_only () = 
       failwith "TODO"

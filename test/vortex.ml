@@ -32,8 +32,7 @@ let fullscreen () = (* two triangles covering the projection of clip space *)
 
 let time = Uniform.float "time" 0.
 let program = 
-  let view_size = Uniform.viewport_size "view_size" in 
-  let uset = Uniform.(add (add empty time) view_size) in
+  let uset = Uniform.(empty + viewport_size "view_size" + time) in
   Prog.create ~uset [
     Prog.shader `Vertex "
     in vec3 vertex;
@@ -79,9 +78,7 @@ let op = { count = 1; effect; prim = fullscreen () }
 
 (* Render *) 
          
-let view = View.create () 
-let draw r = 
-  Renderer.set_view r view;
+let draw r =
   Renderer.frame_begin r; 
   Renderer.frame_add r op;
   Renderer.frame_end r;

@@ -585,6 +585,8 @@ module Uniform : sig
   val add : set -> 'a uniform -> set 
   (** [add s u] is [s] with [u] added. *) 
 
+  val ( + ) : set -> 'a uniform -> set 
+
   val mem_named : set -> string -> bool 
   (** [mem_named s n] is true if [s] has a uniform named [n]. *)
 

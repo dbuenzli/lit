@@ -11,4 +11,8 @@
 * Source-level meta programming, embbed a small shading language in
   OCaml.
 
+* Renderer.set_view v
+  Renderer.set_clears
+  Renderer.add_op 
+  Renderer.render 
 

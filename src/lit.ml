@@ -29,7 +29,7 @@ let err_prim_not_uint t = str "index's scalar type not unsigned integer (%s)" t
 let err_prim_attr_dup n = str "attribute %s specified more than once" n
 
 let err_miss_uniform k = str "no uniform %s" k
-let err_uniform_value_builtin n v = str "uniform %s has builtin value %s" n v
+
 (* Renderer ids. *) 
 
 module Id = struct
@@ -627,6 +627,7 @@ module Uniform = struct
   let empty = Smap.empty 
   let is_empty = Smap.is_empty
   let add s (n, v, _) = Smap.add n (untype v) s   
+  let ( + ) = add
   let set s u = add s u, u
   let def s (n, v, inj) v = Smap.add n (inj v) s
   let def_v s (n, _, _) v = Smap.add n (untype v) s
