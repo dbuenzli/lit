@@ -765,8 +765,48 @@ module Prog = struct
 end
 
 module View = struct
-  type t = int
-  let create () = 1
+
+  (* View and projection matrices *)
+
+  type fov = [ `H of float | `V of float ]
+
+  let persp ~fov ~aspect ~near ~far = 
+    let half_w, half_h = match fov with 
+    | `H theta -> 
+        let half_w = near *. tan (0.5 *. theta) in 
+        half_w, half_w /. aspect
+    | `V theta -> 
+        let half_h = near *. tan (0.5 *. theta) in 
+        aspect *. half_h, half_h 
+    in
+    Gg.M4.persp 
+      ~left:(-.half_w) ~right:(half_w)
+      ~bottom:(-.half_h) ~top:(half_h)
+      ~near ~far
+
+  let look ?(up = V3.oy) ~at ~from:pos () = 
+    let oz' = V3.(unit @@ pos - at) in
+    let ox' = V3.(unit @@ cross up oz') in 
+    let oy' = V3.(unit @@ cross oz' ox') in 
+    let move = V3.neg pos in M4.v
+      (V3.x ox') (V3.y ox') (V3.z ox') (V3.dot ox' move)
+      (V3.x oy') (V3.y oy') (V3.z oy') (V3.dot oy' move)
+      (V3.x oz') (V3.y oz') (V3.z oz') (V3.dot oz' move)
+      0.        0.        0.        1.       
+
+  (* View *) 
+
+  type t = { mutable tr : m4; mutable proj : m4; mutable viewport : box2 }
+
+  let create ?(tr = M4.id) ?(proj = persp (`H Float.pi_div_4) 1.5 1. 100.) 
+      ?(viewport = Box2.unit) () = { tr; proj; viewport }
+  
+  let tr v = v.tr
+  let set_tr v m = v.tr <- m
+  let proj v = v.proj
+  let set_proj v m = v.proj <- m
+  let viewport v = v.viewport 
+  let set_viewport v b = v.viewport <- b
 end
 
 module Effect = struct  

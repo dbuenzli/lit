@@ -793,16 +793,85 @@ end
 (** {1 Rendering} *) 
 
 type view
-(** The type for rendered view volumes. *)
+(** The type for rendered views. *)
 
-(** View volumes.
+(** Views. 
 
-    A view defines a viewing volume in space, the view's background 
-    color and the rectangular portion of the renderer's target it will render
-    to *) 
+    A view defines the rendered view volume in 3D space and the
+    viewport on which rendering occurs on the renderer's surface.
+
+    The view volume is specified by a view transform {!tr} that
+    locates and orients the view volume and a projection transform
+    {!proj} that defines the shape of the volume.  Taken together 
+    these transforms map the view volume to clip space.
+
+    The view's {!viewport} defines a in normalized surface coordinates
+    a rectangular area of the surface. The normalized device coordinates
+    are mapped on the viewport. *)
 module View : sig
+
+  (** {1 View} *) 
+
   type t = view
-  val create : unit -> t
+  (** The type for views. *)
+
+  val create : ?tr:m4 -> ?proj:m4 -> ?viewport:box2  -> unit  -> t
+  (** [create tr proj viewport] is a view such that: 
+      {ul 
+      {- [tr], defines the location and orientation of the view. 
+         Defaults to {!M4.id}, i.e. at the origin and looking at 
+         down the z-axis.}
+      {- [proj] is the projection matrix that defines the viewing
+         volume mapped to clip space. Defaults to {!persp}[(`H
+         Float.pi_div_4) 1.5 1. 100.].}
+      {- [viewport] a rectangular area in normalized screen
+         coordinates of the renderer's viewport; default is
+         {!Box2.unit}.}} *)
+
+  val tr : view -> m4 
+  val set_tr : view -> m4 -> unit
+  val proj : view -> m4 
+  val set_proj : view -> m4 -> unit
+  val viewport : view -> box2 
+  val set_viewport : view -> box2 -> unit 
+
+  (** {1 Projections and view matrices} *)
+       
+  type fov = [ `H of float | `V of float ] 
+  (** The type for field of view angles along horizontal or vertical axes. *)
+
+  val persp : fov:fov -> aspect:float -> near:float -> far:float -> m4
+  (** [persp fov aspect near far] is a perspective projection matrix 
+      such that:
+      {ul 
+      {- [fov] is the field of view angle in radians along a given 
+         axis.}
+      {- [aspect] is the ratio between the horizontal field of view 
+         and the vertical field of view.}
+      {- [near] and [far] are {e positive} distances to the near and 
+         far clip planes.}}
+
+      The transform is defined as follows according to [fov]. 
+      {ul
+      {- If [fov = `V fovy], then let [h = 2 * near * (tan (fovy / 2))] 
+      and [w = aspect * h].}
+      {- If [fov = `H fovx], then let [h = w / aspec] and 
+      [w = 2 * near * (tan (fovx / 2))]}}
+      The projection maps the symmetric frustum with top of the underlying
+      pyramid at the origin, near clip rectangle corners
+      [(-w/2,-h/2,-near)], [(w/2,h/2,-near)] and far plane at [-far]
+      to the axis aligned cube with corners [(-1, -1, -1)] and [(1,1,1)].
+  *) 
+
+  val look : ?up:v3 -> at:p3 -> from:p3 -> unit -> m4
+  (** [look up at pos ()] in layman terms this puts you at position [pos]
+      looking at the point [at] and with your head tilted to match the 
+      {e unit} [up] direction. 
+
+      The transform maps the point [pos] on the origin {!P3.o}, the 
+      vector [oz = V3.(unit (from - at))] to {!V3.oz}. The vector 
+      [ox = V3.(unit (cross up oz))] to {!V3.ox} and the vector 
+      [oy = V3.(unit (cross oz ox))] to {!V3.oy}. *)
 end
 
 type renderer 
