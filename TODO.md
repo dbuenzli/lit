@@ -1,3 +1,8 @@
+* `Uniform.viewport_{o,size}` should we still have them in 
+  normalized surface coordinate and have a seperate `surface_size`
+  builtin ? 
+* View is not what we want yet I think. I should be easy to change 
+  the aspect e.g. maybe specify the projection through a variant.
 * Review the Uniform module, it's not that good I think. 
 * Interface mostly untyped. Explore the possibility of using 
   row polymorphism to match geometry against effects
@@ -11,6 +16,8 @@
 * Source-level meta programming, embbed a small shading language in
   OCaml.
 
+* Renderer.Uniform.builtin : Uniform.builtin -> value_untyped 
+  (* For debugging *) 
 * Renderer.set_view v
   Renderer.set_clears
   Renderer.add_op 

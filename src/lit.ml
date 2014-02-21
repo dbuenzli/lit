@@ -445,9 +445,10 @@ module Uniform = struct
     | Model_to_world : m4 value
     | Model_to_view : m4 value 
     | Model_to_clip : m4 value 
-    | Model_normal_to_view : m4 value 
+    | Model_normal_to_view : m3 value 
     | World_to_view : m4 value
     | World_to_clip : m4 value 
+    | View_to_clip : m4 value 
     | Viewport_o : v2 value
     | Viewport_size : v2 value
 
@@ -458,6 +459,7 @@ module Uniform = struct
     | `Model_normal_to_view 
     | `World_to_view 
     | `World_to_clip 
+    | `View_to_clip
     | `Viewport_o
     | `Viewport_size ]
 
@@ -468,6 +470,7 @@ module Uniform = struct
     | `Model_normal_to_view -> "model_normal_to_view"
     | `World_to_view -> "world_to_view" 
     | `World_to_clip -> "world_to_clip"
+    | `View_to_clip -> "view_to_clip"
     | `Viewport_o -> "viewport_o"
     | `Viewport_size -> "viewport_size"
     end
@@ -502,6 +505,7 @@ module Uniform = struct
   | Model_normal_to_view -> `Builtin `Model_normal_to_view
   | World_to_view -> `Builtin `World_to_view
   | World_to_clip -> `Builtin `World_to_clip
+  | View_to_clip -> `Builtin `View_to_clip
   | Viewport_o -> `Builtin `Viewport_o
   | Viewport_size -> `Builtin `Viewport_size
                        
@@ -519,9 +523,10 @@ module Uniform = struct
   | Model_to_world -> fun v -> `M4 v
   | Model_to_view -> fun v -> `M4 v
   | Model_to_clip -> fun v -> `M4 v
-  | Model_normal_to_view -> fun v -> `M4 v
+  | Model_normal_to_view -> fun v -> `M3 v
   | World_to_view -> fun v -> `M4 v
   | World_to_clip -> fun v -> `M4 v
+  | View_to_clip -> fun v -> `M4 v
   | Viewport_o -> fun v -> `V2 v 
   | Viewport_size -> fun v -> `V2 v 
       
@@ -553,9 +558,10 @@ module Uniform = struct
   | Model_to_world -> M4.zero
   | Model_to_view -> M4.zero
   | Model_to_clip -> M4.zero
-  | Model_normal_to_view -> M4.zero
+  | Model_normal_to_view -> M3.zero
   | World_to_view -> M4.zero
   | World_to_clip -> M4.zero
+  | View_to_clip -> M4.zero
   | Viewport_o -> P2.o
   | Viewport_size -> V2.zero
 
@@ -573,9 +579,10 @@ module Uniform = struct
   | Model_to_world -> (n, M4 v, inj)
   | Model_to_view -> (n, M4 v, inj)
   | Model_to_clip -> (n, M4 v, inj)
-  | Model_normal_to_view -> (n, M4 v, inj)
+  | Model_normal_to_view -> (n, M3 v, inj)
   | World_to_view -> (n, M4 v, inj)
   | World_to_clip -> (n, M4 v, inj)
+  | View_to_clip -> (n, M4 v, inj)
   | Viewport_o -> (n, V2 v, inj)
   | Viewport_size -> (n, V2 v, inj)
 
@@ -588,6 +595,7 @@ module Uniform = struct
   | Model_normal_to_view -> true
   | World_to_view -> true 
   | World_to_clip -> true
+  | View_to_clip -> true
   | Viewport_o -> true
   | Viewport_size -> true 
   | Bool _ -> false | Int _ -> false | Float _ -> false 
@@ -615,6 +623,7 @@ module Uniform = struct
 
   let world_to_view n = let v = World_to_view in (n, v, untype_fun v)
   let world_to_clip n = let v = World_to_clip in (n, v, untype_fun v)
+  let view_to_clip n = let v = View_to_clip in (n, v, untype_fun v)
   let viewport_o n = let v = Viewport_o in (n, v, untype_fun v)
   let viewport_size n = let v = Viewport_size in (n, v, untype_fun v)
 
@@ -792,7 +801,7 @@ module View = struct
       (V3.x ox') (V3.y ox') (V3.z ox') (V3.dot ox' move)
       (V3.x oy') (V3.y oy') (V3.z oy') (V3.dot oy' move)
       (V3.x oz') (V3.y oz') (V3.z oz') (V3.dot oz' move)
-      0.        0.        0.        1.       
+      0.          0.        0.         1.       
 
   (* View *) 
 
@@ -830,7 +839,7 @@ module Effect = struct
   let set_info e i = e.info <- i
 end
 
-type op = { count : int; effect : Effect.t; prim : Prim.t }
+type op = { count : int; effect : Effect.t; tr : m4; prim : Prim.t }
 
 module Renderer = struct
 

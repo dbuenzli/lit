@@ -74,7 +74,7 @@ let program =
   ]
 
 let effect = Effect.create program 
-let op = { count = 1; effect; prim = fullscreen () } 
+let op = { count = 1; effect; tr = M4.id; prim = fullscreen () } 
 
 (* Render *) 
          

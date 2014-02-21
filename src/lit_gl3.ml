@@ -106,11 +106,15 @@ type t =
     mutable debug : bool;
     mutable log : Log.t; 
     mutable compiler_msg_parser : Log.compiler_msg_parser;
-    mutable view : view; 
     mutable size : size2;
+    mutable view : view;
+    mutable world_to_clip : m4 Lazy.t; (* cache *) 
     mutable 
       batches : op list Imap.t; (* maps programs ids to rendering operations *) 
   }
+
+let log_error r msg = r.log `Error msg 
+let log_debug r msg = r.log `Debug msg
 
 (* Caps *) 
 
@@ -323,6 +327,9 @@ module Prog = struct
       Gl.float_vec2, `Float32 `V2; 
       Gl.float_vec3, `Float32 `V3; 
       Gl.float_vec4, `Float32 `V4;
+      Gl.float_mat2, `Float32 `M2;
+      Gl.float_mat3, `Float32 `M3;
+      Gl.float_mat4, `Float32 `M4;
       Gl.int, `Int32 `V1;
       Gl.int_vec2, `Int32 `V2; 
       Gl.int_vec3, `Int32 `V3; 
@@ -407,7 +414,6 @@ module Prog = struct
       Gl.unsigned_int_vec2, `UInt32 `V2; 
       Gl.unsigned_int_vec3, `UInt32 `V3; 
       Gl.unsigned_int_vec4, `UInt32 `V4 ]
-
 
   let enum_of_shader_kind = function
   | `Fragment -> Gl.fragment_shader 
@@ -507,7 +513,7 @@ module Prog = struct
       Gl.shader_source id src;
       Gl.compile_shader id;
       if Gl_hi.get_shader_int id Gl.compile_status = Gl.true_ then ids else
-      (r.log `Error (compiler_log_msg r id fmap); Gl.delete_shader id; `Error)
+      (log_error r (compiler_log_msg r id fmap); Gl.delete_shader id; `Error)
   
   let setup r prog = match info prog with
   | Some i -> if i.id = 0 then `Error else `Ok i.id
@@ -516,7 +522,7 @@ module Prog = struct
       let supported s = List.mem (Prog.kind s) supported in 
       let shaders, unsupported = List.partition supported (Prog.shaders prog) in
       if unsupported <> [] 
-      then (r.log `Error (`Unsupported_shaders (prog, unsupported)); `Error)
+      then (log_error r (`Unsupported_shaders (prog, unsupported)); `Error)
       else
       let info = match List.fold_left (compile r) (`Ok []) shaders with 
       | `Ok ids ->
@@ -528,7 +534,7 @@ module Prog = struct
           then `Ok (setup_info r prog id) 
           else 
           begin 
-            r.log `Error (linker_log_msg r id); 
+            log_error r (linker_log_msg r id); 
             Gl.delete_program id; 
             `Error
           end
@@ -538,26 +544,20 @@ module Prog = struct
       | `Error -> set_info prog error_info; `Error
       | `Ok info -> `Ok (info.id)
 
-  let resolve_builtin r m2w = function 
-  | `Viewport_size -> `V2 r.size
-  | `Model_to_world -> `M4 (Lazy.force m2w)
-  | `Viewport_o -> 
-      failwith "TODO"
-  | `Model_to_view -> 
-      failwith "TODO"
-  (* M4.mul r.world_to_view (Lazy.force m2w) *)
+  let resolve_builtin r model_to_world = function 
+  | `Model_to_world -> `M4 (Lazy.force model_to_world)
+  | `Model_to_view -> `M4 (M4.mul (View.tr r.view) (Lazy.force model_to_world))
   | `Model_to_clip -> 
-      failwith "TODO"
-  (* M4.mul (M4.mul r.view_to_clip r.world_to_view) (Lazy.force m2w) *)
+      `M4 (M4.mul (Lazy.force r.world_to_clip) (Lazy.force model_to_world))
   | `Model_normal_to_view -> 
-      failwith "TODO"
-  (*   M4.transpose(M4.inv(self.world_to_view * m2w)) *) 
-  | `World_to_clip ->
-      failwith "TODO"
-   (* M4.mul r.view_to_clip * r.world_to_view *) 
-  | `World_to_view -> 
-      failwith "TODO"
-  (*       r.world_to_view *)
+      `M3 (M3.of_m4 
+             (M4.(transpose (inv (mul (View.tr r.view)
+                                    (Lazy.force model_to_world))))))
+  | `World_to_clip -> `M4 (Lazy.force r.world_to_clip)
+  | `World_to_view -> `M4 (View.tr r.view)
+  | `View_to_clip -> `M4 (View.proj r.view)
+  | `Viewport_size -> `V2 (V2.mul (Box2.size (View.viewport r.view)) r.size) 
+  | `Viewport_o -> `V2 (V2.mul (Box2.o (View.viewport r.view)) r.size)
 
   let ivec k = function 
   | `Bool b -> if k > 0 then raise Exit else (if b then 1 else 0)
@@ -586,7 +586,7 @@ module Prog = struct
       end
   | _ -> raise Exit
 
-  let fvec k = function 
+  let fvec k = function
   | `Bool b -> if k > 0 then raise Exit else (if b then 1. else 0.)
   | `Int i -> if k > 0 then raise Exit else (float i)
   | `Float f -> if k > 0 then raise Exit else f
@@ -641,14 +641,16 @@ module Prog = struct
       mc
   | _ -> raise Exit 
 
-  let bind_uniforms r prog e =
+  let bind_uniforms r prog e op =
     let us = Effect.uniforms e in 
-    let m2w = lazy (M4.id) (* TODO *) in 
-(*    let next_active_tex = ref 0 in*)
+    let model_to_world = lazy (M4.mul op.tr (Prim.tr op.prim)) in
     let bind_uniform name u = match Uniform.find_named us name with 
-    | None -> r.log `Error (`Msg (str "uniform %s undefined" name))(*TODO*) 
+    | None -> log_error r (`Msg (str "uniform %s undefined" name))(*TODO*) 
     | Some v ->
-        let v = match v with `Builtin b -> resolve_builtin r m2w b | v -> v in 
+        let v = match v with 
+        | `Builtin b -> resolve_builtin r model_to_world b 
+        | v -> v 
+        in 
         let i = ivec in
         let f = fvec in 
         try match u.u_type with 
@@ -685,16 +687,14 @@ module Prog = struct
             Gl.uniform1i u.u_loc !next_active_tex; 
             incr next_active_tex;
 *)
-
-        | `Unsupported _ -> 
-          failwith "TODO"
+        | `Unsupported v -> 
+            log_error r (`Msg (str "Unsupported uniform type: %d" v))
         with Exit -> 
-          r.log 
-            `Error (`Msg (str "uniform value type mismatch %s" name)) (*TODO*)
+          log_error r (`Msg (str "uniform value type mismatch %s" name))
+          (*TODO custom error message *)
     in 
     Smap.iter bind_uniform prog.uniforms 
     
-  
   let bind_prim r prog_info prim =
     let prim_info = Prim.get_info prim in    
     Gl.bind_vertex_array prim_info.Prim.id;
@@ -759,7 +759,7 @@ let init_gl_state r =
 let init_framebuffer r = 
   let w = Float.int_of_round (Size2.w r.size) in 
   let h = Float.int_of_round (Size2.h r.size) in
-  let c = Color.black in 
+  let c = Color.white in 
   Gl.viewport 0 0 w h;
   Gl.clear_color (Color.r c) (Color.g c) (Color.b c) (Color.a c);
   Gl.clear Gl.color_buffer_bit;
@@ -767,7 +767,7 @@ let init_framebuffer r =
 
 let render_op r prog_info op = 
   Prog.bind_prim r prog_info op.prim; 
-  Prog.bind_uniforms r prog_info op.effect;
+  Prog.bind_uniforms r prog_info op.effect op;
   Effect.set_rasterization_state r op.effect; 
   Effect.set_depth_state r op.effect; 
   match Prim.index op.prim with
@@ -809,8 +809,9 @@ let create ?compiler_msg_parser log ~debug size =
   in
   { init = false;
     debug; log; compiler_msg_parser; 
-    view = View.create ();
     size; 
+    view = View.create ();
+    world_to_clip = lazy M4.id;
     batches = Imap.empty; }
 
 let init r =
@@ -820,8 +821,10 @@ let init r =
 let size r = r.size 
 let set_size r s = r.size <- s
 let view r = r.view
-let set_view r v = r.view <- v
-
+let set_view r view = 
+  r.view <- view;
+  r.world_to_clip <- lazy (M4.mul (View.proj view) (View.tr view))
+      
 let frame_begin r = 
   if not r.init then (r.init <- true; init r)
   

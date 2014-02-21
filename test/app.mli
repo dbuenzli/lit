@@ -113,12 +113,15 @@ val default : config
 val create : config -> t
 (** [create config] *)
 
+val size : t -> size2 
+(** [size app] is [app]'s size. *)
+
 (** {1 Run} *) 
 
 val run : t -> [ `Ok | `Error of string | `Quit ]
 (** [run app] runs the app [name] using [ev] and [config]. *)
 
-val handle_run : t -> unit 
+val handle_run : t -> unit
 
 
 (*---------------------------------------------------------------------------

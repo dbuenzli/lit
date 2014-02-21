@@ -538,11 +538,14 @@ module Uniform : sig
   val model_to_world : string -> m4 uniform 
   val model_to_view : string -> m4 uniform 
   val model_to_clip : string -> m4 uniform 
-  val model_normal_to_view : string -> m4 uniform 
+  val model_normal_to_view : string -> m3 uniform 
   val world_to_view : string -> m4 uniform 
   val world_to_clip : string -> m4 uniform 
+  val view_to_clip : string -> m4 uniform
   val viewport_o : string -> v2 uniform 
+  (** in surface coordinates. *) 
   val viewport_size : string -> v2 uniform 
+  (** in surface coordinates. *) 
 
   (** {1 Uniform values} *) 
 
@@ -553,6 +556,7 @@ module Uniform : sig
     | `Model_normal_to_view 
     | `World_to_view 
     | `World_to_clip 
+    | `View_to_clip
     | `Viewport_o
     | `Viewport_size ]
   (** The type for built-in uniform values. *) 
@@ -802,10 +806,10 @@ type view
 
     The view volume is specified by a view transform {!tr} that
     locates and orients the view volume and a projection transform
-    {!proj} that defines the shape of the volume.  Taken together 
-    these transforms map the view volume to clip space.
+    {!proj} that defines the shape of the volume. Multiplied toghether
+    these transform map world space to clip space.
 
-    The view's {!viewport} defines a in normalized surface coordinates
+    The view's {!viewport} defines, in normalized surface coordinates,
     a rectangular area of the surface. The normalized device coordinates
     are mapped on the viewport. *)
 module View : sig
@@ -818,15 +822,20 @@ module View : sig
   val create : ?tr:m4 -> ?proj:m4 -> ?viewport:box2  -> unit  -> t
   (** [create tr proj viewport] is a view such that: 
       {ul 
-      {- [tr], defines the location and orientation of the view. 
-         Defaults to {!M4.id}, i.e. at the origin and looking at 
-         down the z-axis.}
-      {- [proj] is the projection matrix that defines the viewing
-         volume mapped to clip space. Defaults to {!persp}[(`H
-         Float.pi_div_4) 1.5 1. 100.].}
+      {- [tr], defines the location and orientation of the view.
+         It is the transform that maps world coordinates to view 
+         coordinates. Defaults to {!M4.id}, i.e. we are at the origin
+         looking at down the z-axis. It defines the builtin uniform 
+         value {!Uniform.world_to_view}.}
+      {- [proj], defines the viewing volume. It is the transform 
+         that maps view coordinates to clip space. Defaults to 
+         {!persp}[(`H Float.pi_div_4) 1.5 1. 100.]. It defines the 
+         builtin uniform value {!Uniform.view_to_clip}.}
       {- [viewport] a rectangular area in normalized screen
          coordinates of the renderer's viewport; default is
-         {!Box2.unit}.}} *)
+         {!Box2.unit}. It defines the builtin uniform values 
+         {!Uniform.viewport_o} and {!Uniform.viewport_size}.
+      }} *)
 
   val tr : view -> m4 
   val set_tr : view -> m4 -> unit
@@ -864,21 +873,26 @@ module View : sig
   *) 
 
   val look : ?up:v3 -> at:p3 -> from:p3 -> unit -> m4
-  (** [look up at pos ()] in layman terms this puts you at position [pos]
-      looking at the point [at] and with your head tilted to match the 
-      {e unit} [up] direction. 
+  (** [look up at ~from:pos ()] in layman terms this is the transform
+      which has the effect of putting you at position [pos] looking at
+      the point [at] and with your head tilted to match the [up]
+      direction.
 
-      The transform maps the point [pos] on the origin {!P3.o}, the 
-      vector [oz = V3.(unit (from - at))] to {!V3.oz}. The vector 
-      [ox = V3.(unit (cross up oz))] to {!V3.ox} and the vector 
-      [oy = V3.(unit (cross oz ox))] to {!V3.oy}. *)
+      More precisely, the transform maps:
+      {ul 
+      {- [pos] on the origin {!P3.o}}
+      {- [oz' = V3.(unit (from - at))] to {!V3.oz}}
+      {- [ox' = V3.(unit (cross up oz'))] to {!V3.ox}}
+      {- [oy' = V3.(unit (cross oz ox'))] to {!V3.oy}}} 
+      The final up vector [oy'] matches exactly up only if [up]
+      is orthogonal the the forward direction [at - from]. *)
 end
 
 type renderer 
 (** The type for renderers. *)
 
 type op = 
-  { count : int; effect : effect; prim : prim }
+  { count : int; effect : effect; tr : m4; prim : prim }
 (** The type for render operations. *) 
 
 (** Renderers *) 

@@ -246,6 +246,8 @@ let create config =
       app
   | _ -> app
 
+let size app = app.config.size
+
 let update_surface app = match app.init with 
 | `Ok (win, _) -> Sdl.gl_swap_window win
 | _ -> ()
