@@ -130,9 +130,9 @@ module Buf : sig
       (defaults to [false]). *)
 
   val scalar_type_to_string : scalar_type -> string 
-  (** [scalar_type_to_string st] is an unspecified string representing
-      [st]. *) 
-
+  (** [scalar_type_to_string st] is an unspecified textual representation
+      of [st]. *) 
+  
   val pp_scalar_type : Format.formatter -> scalar_type -> unit
   (** [pp_scalar_type ppf st] prints and unspecified representation 
       of [st] on [ppf]. *) 
@@ -850,7 +850,7 @@ module View : sig
   val set_proj : view -> m4 -> unit
   val viewport : view -> box2 
   val set_viewport : view -> box2 -> unit 
-
+    
   (** {1 Projections and view matrices} *)
        
   type fov = [ `H of float | `V of float ] 

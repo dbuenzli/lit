@@ -316,21 +316,20 @@ module Prim = struct
     | `Triangles | `Triangle_strip | `Triangle_fan
     | `Triangles_adjacency | `Triangle_strip_adjacency ]
     
-  let pp_kind ppf kind = pp ppf begin match kind with
-    | `Points -> "points"
-    | `Lines -> "lines"
-    | `Line_strip -> "line_strip"
-    | `Line_loop -> "line_loop"
-    | `Lines_adjacency -> "lines_adjacency"
-    | `Line_strip_adjacency -> "line_strip_adjacency"
-    | `Triangles -> "triangles"
-    | `Triangle_strip -> "triangle_strip"
-    | `Triangle_fan -> "triangle_fan"
-    | `Triangles_adjacency -> "triangles_adjacency"
-    | `Triangle_strip_adjacency -> "triangle_strip_adjacency"
-    end
+  let kind_to_string = function
+  | `Points -> "points"
+  | `Lines -> "lines"
+  | `Line_strip -> "line_strip"
+  | `Line_loop -> "line_loop"
+  | `Lines_adjacency -> "lines_adjacency"
+  | `Line_strip_adjacency -> "line_strip_adjacency"
+  | `Triangles -> "triangles"
+  | `Triangle_strip -> "triangle_strip"
+  | `Triangle_fan -> "triangle_fan"
+  | `Triangles_adjacency -> "triangles_adjacency"
+  | `Triangle_strip_adjacency -> "triangle_strip_adjacency"
 
-  let kind_to_string v = to_string_of_formatter pp_kind v
+  let pp_kind ppf kind = pp ppf "%s" (kind_to_string kind)
  
   (* Primitives *) 
       
