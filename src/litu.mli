@@ -53,6 +53,31 @@ module Prim : sig
       If [tex] is specified, 2D texture coordinates are added to 
       the primitive under that attribute name. Bottom left is
       (0,0), top right (1,1). *)
+
+  (** {1 Functions} *) 
+
+  val with_normals : ?scalar_type:[`Float32 | `Float64] -> 
+    ?name:string -> prim -> prim 
+  (** [with_normals prim] is [prim] with a {!Lit.Attr.normal}
+      attribute added or replaced. The attribute has a normal per
+      {!Lit.Attr.vertex} attribute computed from the primitive's
+      triangles. In case a vertex belongs to multiple triangles 
+      the contribution of each triangle is summed up and the result
+      normalized.
+
+      {b Warning.} Vertex data is looked up by taking vertices 
+      from their buffer taking into account {!Lit.Attr.first} 
+      and {!Lit.Attr.stride} {b until the end} of the buffer.
+
+      @raise Invalid_argument if one of these conditions holds:
+      {ul 
+      {- [Prim.kind prim] is not [`Triangles]}
+      {- There is no {!Lit.Attr.vertex} attribute or its dimension is not 3.}
+      {- The {!Lit.Attr.vertex} attribute buffer is not in CPU memory or
+         its bigarray buffer can't be read using [float]s.}
+      {- The [Prim.index prim] buffer (if any) is not in CPU memory or 
+         its bigarray buffer can't be read using [int]s or [int32].}} *)
+
 end
 
 (** Higher level effects. *) 

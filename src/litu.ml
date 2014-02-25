@@ -7,6 +7,22 @@
 open Gg
 open Lit
 
+
+let str = Format.sprintf
+
+(* Invalid argument strings. *) 
+
+let err_no_cpu_buf b = str "%s: no CPU buffer" b
+let err_dim k dim = str "%s: unsupported dimension (%d)" k dim
+let err_prim_kind k = 
+  str "unsupported primitive kind (%s)" (Prim.kind_to_string k)
+
+let err_buf_scalar_type k st = 
+  str "%s: unsupported buffer scalar type (%s)" k 
+    (Buf.scalar_type_to_string st)
+
+(* Primitives *) 
+
 module Prim = struct
 
   let cuboid_dups ?name extents = 
@@ -163,7 +179,7 @@ module Prim = struct
     let index = Buf.create ~unsigned:true (`Bigarray is) in
     Prim.create ?name ~index `Triangles attrs
     
-  let rect ?(name = "rect") ?tex ?(segs = Size2.unit) size =
+  let rect ?name ?tex ?(segs = Size2.unit) size =
     let do_tex = tex <> None in
     let xseg = Float.int_of_round (Size2.w segs) in
     let yseg = Float.int_of_round (Size2.h segs) in
@@ -204,7 +220,104 @@ module Prim = struct
       done;
       Buf.create (`Bigarray b)
     in
-    Prim.create ~name ~index `Triangles attrs 
+    Prim.create ?name ~index `Triangles attrs 
+
+  (* Functions *) 
+  
+  let vertex_index_iterator count idx = 
+    (* That's not going to be very efficient... *) 
+    let max = count - 1 in
+    let i = ref (-1) in
+    match idx with 
+    | Some b when not (Buf.cpu_exists b) -> 
+        invalid_arg (err_no_cpu_buf "index")
+    | None -> 
+        (* Indices are the linear count. *) 
+        fun () -> if !i = max then assert false else (incr i; !i)
+    | Some b -> 
+        let get_cpu b k = match Buf.cpu b k with 
+        | Some ba -> ba 
+        | None -> assert false 
+        in
+        match Buf.scalar_type b with 
+        | `UInt8 -> 
+            let ba = get_cpu b Bigarray.int8_unsigned in 
+            fun () -> if !i = max then assert false else (incr i; ba.{!i})
+        | `UInt16 -> 
+            let ba = get_cpu b Bigarray.int16_unsigned in 
+            fun () -> if !i = max then assert false else (incr i; ba.{!i})
+        | `UInt32 -> 
+            (* That's actually the culprit, it's annoying. *) 
+            let ba = get_cpu b Bigarray.int32 in
+            fun () -> if !i = max then assert false else 
+              (incr i; Int32.to_int (ba.{!i}))
+        | _ -> assert false (* This is guaranted by Prim.create *) 
+            
+                
+  let do_normals : tri_count:int -> index:(unit -> int) -> 
+    vs:(float, 'c) bigarray -> vs_first:int -> vs_stride:int -> 
+    ns:(float, 'd) bigarray -> unit = 
+    fun ~tri_count ~index ~vs ~vs_first ~vs_stride ~ns ->
+    let count = Bigarray.Array1.dim ns in
+    let vs_width = 3 + vs_stride in
+    for i = 0 to count - 1 do ns.{i} <- 0. done;
+    for i = 0 to tri_count - 1 do
+      let vi1 = index () in 
+      let vi2 = index () in 
+      let vi3 = index () in 
+      let v1 = Ba.get_v3 vs (vs_first + vi1 * vs_width) in 
+      let v2 = Ba.get_v3 vs (vs_first + vi2 * vs_width) in 
+      let v3 = Ba.get_v3 vs (vs_first + vi3 * vs_width) in
+      let n = V3.(cross (v2 - v1) (v3 - v1)) in
+      ignore (Ba.set_v3 ns (vi1 * 3) (V3.add n (Ba.get_v3 ns (vi1 * 3)))); 
+      ignore (Ba.set_v3 ns (vi2 * 3) (V3.add n (Ba.get_v3 ns (vi2 * 3)))); 
+      ignore (Ba.set_v3 ns (vi3 * 3) (V3.add n (Ba.get_v3 ns (vi3 * 3))));
+    done; 
+    for i = 0 to (count / 3) - 1 do 
+      ignore (Ba.set_v3 ns (i * 3) (V3.unit (Ba.get_v3 ns (i * 3))))
+    done
+    
+  let with_normals ?(scalar_type = `Float32)  ?name p =
+    let kind = Prim.kind p in 
+    if kind <> `Triangles then invalid_arg (err_prim_kind kind) else 
+    let index, tri_count = match Prim.index p with 
+    | Some b when not (Buf.cpu_exists b) -> invalid_arg (err_no_cpu_buf "index")
+    | Some _ | None as i -> 
+        let count = Prim.count_now p in
+        vertex_index_iterator count i, count / 3
+    in
+    let vs = Prim.get p Attr.vertex (* raises if not found *) in
+    let dim = Attr.dim vs in 
+    if dim <> 3 then invalid_arg (err_dim "vertex attribute" dim) else
+    let vs_first = Attr.first vs in 
+    let vs_stride = Attr.stride vs in
+    let vs = Attr.buf vs in
+    let ns = 
+      let do_it vs_ba_kind ns_ba_kind = match Buf.cpu vs vs_ba_kind with 
+      | None -> invalid_arg (err_no_cpu_buf "vertex attribute")
+      | Some vs -> 
+          let count = (Bigarray.Array1.dim vs - vs_first) / (3 + vs_stride) in 
+          let ns = Ba.create ns_ba_kind (3 * count) in 
+          do_normals ~index ~tri_count ~vs ~vs_first ~vs_stride ~ns; 
+          Attr.create Attr.normal ~dim:3 (Buf.create (`Bigarray ns))
+      in
+      match Buf.scalar_type vs, scalar_type with 
+      | `Float32, `Float32 -> do_it Bigarray.float32 Bigarray.float32
+      | `Float32, `Float64 -> do_it Bigarray.float32 Bigarray.float64
+      | `Float64, `Float32 -> do_it Bigarray.float64 Bigarray.float32
+      | `Float64, `Float64 -> do_it Bigarray.float64 Bigarray.float64
+      | st, _ -> invalid_arg (err_buf_scalar_type "vertex attribute" st)
+    in
+    let attrs = 
+      let not_normal a = Attr.name a <> Attr.normal in
+      ns :: (List.filter not_normal (Prim.attrs p)) 
+    in
+    let tr = Prim.tr p in
+    let first = Prim.first p in
+    let count = Prim.count p in 
+    let index = Prim.index p in
+    Prim.create ?name ~tr ~first ?count ?index kind attrs
+        
 end
 
 module Effects = struct
