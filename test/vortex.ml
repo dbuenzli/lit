@@ -84,15 +84,25 @@ let draw r =
   Renderer.frame_end r;
   ()
     
-let ev r app e = match (e : App.ev) with
-| `Env `Init -> Demo.show_start r; `Ok
-| `Env `Exit -> Renderer.release r; Demo.show_stop (); `Ok
-| `Env (`Resize size) -> Renderer.set_size r size; `Ok
-| `Tick now ->
+let command r app = function
+| `Init -> Demo.show_start r; `Ok 
+| `Exit -> Renderer.release r; Demo.show_stop (); `Quit
+| `Resize size -> Renderer.set_size r size; `Ok 
+| `Toggle_fullscreen -> App.toggle_fullscreen app; `Ok 
+| `Tick now -> 
     Effect.set_uniform op.effect time now;
     Demo.show_stats now draw r App.update_surface app;
     `Ok
-| _ -> `Ok 
+
+let ev r app e = match (e : App.ev) with
+| `Env (`Init | `Exit | `Resize _ as cmd) -> command r app cmd
+| `Key (`Up, k) -> 
+    begin match Demo.command_of_key k with 
+    | Some cmd -> command r app cmd 
+    | None -> `Ok 
+    end
+| `Tick _ as cmd -> command r app cmd
+| _ -> `Ok
 
 let main () = 
   let size = V2.v 600. 400. in

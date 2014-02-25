@@ -6,6 +6,9 @@
 
 (** A few common, ad-hoc, tools for Lit's demos. *) 
 
+(** {1 Default keyboard commands} *) 
+
+val command_of_key : App.key_sym -> [ `Toggle_fullscreen | `Exit ] option
 
 (** {1 Terminal output} *) 
 

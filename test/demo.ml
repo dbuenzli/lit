@@ -8,6 +8,13 @@ open Lit
 
 let pp = Format.printf 
 
+(* Default keyboard commands *) 
+
+let command_of_key = function
+| `Escape -> Some `Exit
+| `Space -> Some `Toggle_fullscreen
+| _ -> None
+
 (* Terminal output *) 
 
 let show_start r = 
