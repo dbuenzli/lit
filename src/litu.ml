@@ -41,16 +41,18 @@ module Prim = struct
     in
     let index = 
       let b = Ba.create Bigarray.int8_unsigned (6 * 2 * 3) in 
-      let i = Ba.set_3d b 0 4 7 6 in  (* Bottom *)
-      let i = Ba.set_3d b i 4 6 5 in 
-      let i = Ba.set_3d b i 8 1 0 in  (* Left *)
-      let i = Ba.set_3d b i 8 0 9 in 
-      let i = Ba.set_3d b i 12 4 5 in  (* Right *)
-      let i = Ba.set_3d b i 12 3 4 in 
-      let i = Ba.set_3d b i 16 7 8 in  (* Top *) 
-      let i = Ba.set_3d b i 16 8 9 in 
-      let i = Ba.set_3d b i 20 3 2 in  (* Rear *)
-      let _ = Ba.set_3d b i 20 2 1 in 
+      let i = Ba.set_3d b 0  0  2  3 in (* Front *)
+      let i = Ba.set_3d b i  0  1  2 in 
+      let i = Ba.set_3d b i  4  7  6 in (* Bottom *)
+      let i = Ba.set_3d b i  4  6  5 in 
+      let i = Ba.set_3d b i  8 11 10 in (* Left *)
+      let i = Ba.set_3d b i  8 10  9 in 
+      let i = Ba.set_3d b i 12 14 15 in (* Right *) 
+      let i = Ba.set_3d b i 12 13 14 in 
+      let i = Ba.set_3d b i 16 17 18 in (* Top *)
+      let i = Ba.set_3d b i 16 18 19 in
+      let i = Ba.set_3d b i 20 23 22 in (* Rear *)
+      let _ = Ba.set_3d b i 20 22 21 in
       Buf.create (`Bigarray b)
     in
     Prim.create ?name ~index `Triangles attrs 
