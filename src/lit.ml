@@ -26,7 +26,7 @@ let err_attr_dim dim = str "invalid attribute dimension %d" dim
 let err_no_cpu_buffer = str "no cpu buffer" 
 let err_ba_kind kind = str "unsupported bigarray kind for Lit.Buf" 
 let err_ba_kind_mismatch exp = 
-  str "bigarray kind mismatch expected kind for %s" exp (* TODO found: ba *)
+  str "bigarray kind mismatch (scalar type is %s)" exp (* TODO found: ba *)
 
 let err_prim_underspec = str "one of ?index or ?count must be specified"
 let err_prim_not_uint t = str "index's scalar type not unsigned integer (%s)" t
