@@ -18,6 +18,7 @@ type env = [ `Init | `Exit | `Yield | `Resize of size2
            | `Mode of mode ] 
 
 type key_sym = [ 
+    | `Space
     | `Alt of [ `Left | `Right ]
     | `Arrow of [ `Down | `Up | `Left | `Right ]
     | `Backspace
@@ -40,7 +41,7 @@ type key_sym = [
 
 type key = [ `Down | `Up ] * key_sym
 
-type mouse_button = [ `Left | `Right ]
+type mouse_button = [ `Left | `Right | `Middle | `X1 | `X2 ]
 type mouse = 
   [ `Button of [ `Down | `Up ] * mouse_button * p2 
   | `Motion of p2 * v2 ]
@@ -77,6 +78,13 @@ and t = {
 let window a = match a.init with 
 | `Ok (win, _) -> Some win
 | _ -> None
+
+let size app = match app.init with 
+| `Ok (win, _) -> 
+    let w, h = Sdl.get_window_size win in
+    Size2.v (float w) (float h)
+| _ -> app.config.size 
+
 
 let is_fullscreen a = a.is_fullscreen
 let text_ev a = a.text_ev 
@@ -162,48 +170,71 @@ let toggle_fullscreen app = match app.init with
 
 let callback_ev app e = app.state <- app.config.ev app e
 
-let key_up app e = callback_ev app (`Key (`Up, `Home))
-let key_down app e = 
-  if Sdl.Event.(get e keyboard_repeat) <> 0 then () else
-  callback_ev app (`Key (`Down, `Home))
-
-let text_editing app e = 
+let text_editing_ev app e = 
   let text = Sdl.Event.(get e text_editing_text) in 
   let start = Sdl.Event.(get e text_editing_start) in 
   let len = Sdl.Event.(get e text_editing_length) in 
   Printf.printf "TODO Text editing ! t:%s start:%d len:%d" text start len
     
-let text_input app e = 
+let text_input_ev app e = 
   let text = Sdl.Event.(get e text_input_text) in
   callback_ev app (`Text text)
 
-let keyboard app e =
+let window_ev app e = 
+  match Sdl.Event.(window_event_enum (get e window_event_id)) with
+  | `Exposed | `Resized -> callback_ev app (`Env (`Resize (size app)))
+  | _ -> ()
+
+let keyboard_ev app e state =
   let key_scancode e = Sdl.Scancode.enum Sdl.Event.(get e keyboard_scancode) in
   match key_scancode e with 
-  | `Escape -> `Exit
-  | `Space -> toggle_fullscreen app; `Ok 
-  | _ -> `Ok
+  | `Escape -> callback_ev app (`Key (state, `Escape))
+  | `Space -> callback_ev app (`Key (state, `Space))
+  | _ -> ()
+
+let mouse_button_ev app e state =   
+  let pos =
+    let x = Sdl.Event.(get e mouse_button_x) in 
+    let y = Sdl.Event.(get e mouse_button_y) in
+    let size = size app in
+    P2.v (float x /. Size2.w size) (1. -. (float y /. Size2.h size))      
+  in
+  let but = match Sdl.Event.(get e mouse_button_button) with 
+  | b when b = Sdl.Button.left -> `Left
+  | b when b = Sdl.Button.right -> `Right
+  | b when b = Sdl.Button.middle -> `Middle 
+  | b when b = Sdl.Button.x1 -> `X1
+  | b when b = Sdl.Button.x2 -> `X2
+  | b -> `Left (* avoid assert false, SDL may come up with new things *) 
+  in
+  callback_ev app (`Mouse (`Button (state, but, pos)))
+
+let mouse_motion_ev app e = 
+  let size = size app in
+  let pos = 
+    let x = Sdl.Event.(get e mouse_motion_x) in 
+    let y = Sdl.Event.(get e mouse_motion_y) in 
+    P2.v (float x /. Size2.w size) (1. -. (float y /. Size2.h size))
+  in
+  let rel = 
+    let xrel = Sdl.Event.(get e mouse_motion_xrel) in 
+    let yrel = Sdl.Event.(get e mouse_motion_yrel) in
+    P2.v (float xrel /. Size2.w size) (1. -. (float yrel /. Size2.h size))
+  in
+  callback_ev app (`Mouse (`Motion (pos, rel)))
 
 let do_event app e = 
   let event e = Sdl.Event.(enum (get e typ)) in
-  let window_event e = Sdl.Event.(window_event_enum (get e window_event_id)) in
-  let window_size e = Sdl.Event.(get e window_data1, get e window_data2) in
   match event e with 
   | `Quit -> app.state <- `Quit
-  | `Key_down -> 
-        if keyboard app e = `Exit then app.state <- `Quit else 
-        (ignore (key_down app e))
-  | `Key_up -> ignore (key_up app e)
-  | `Window_event -> 
-      begin match window_event e with 
-      | `Exposed (* TODO w,h = 0 ? *)| `Resized -> 
-          let w, h = window_size e in
-          let size = Size2.v (Int32.to_float w) (Int32.to_float h) in
-          callback_ev app (`Env (`Resize size));
-      | _ -> ()
-      end
-  | `Text_editing -> text_editing app e
-  | `Text_input -> ignore (text_input app e)
+  | `Key_down -> keyboard_ev app e `Down 
+  | `Key_up -> keyboard_ev app e `Up
+  | `Window_event -> window_ev app e 
+  | `Mouse_button_down -> mouse_button_ev app e `Down
+  | `Mouse_button_up -> mouse_button_ev app e `Up
+  | `Mouse_motion -> mouse_motion_ev app e
+  | `Text_editing -> text_editing_ev app e
+  | `Text_input -> ignore (text_input_ev app e)
   | _ -> ()
            
 let event_loop app _ =
@@ -246,7 +277,6 @@ let create config =
       app
   | _ -> app
 
-let size app = app.config.size
 
 let update_surface app = match app.init with 
 | `Ok (win, _) -> Sdl.gl_swap_window win

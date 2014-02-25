@@ -48,33 +48,36 @@ type mode = [ `Windowed | `Fullscreen ]
 type env = [ `Init | `Exit | `Yield | `Resize of size2 
            | `Mode of mode ] 
 
-type key_sym = [ 
-    | `Alt of [ `Left | `Right ]
-    | `Arrow of [ `Down | `Up | `Left | `Right ]
-    | `Backspace
-    | `Capslock
-    | `Ctrl of [ `Left | `Right ]
-    | `End
-    | `Enter
-    | `Escape
-    | `Function of int
-    | `Home
-    | `Letter of char
-    | `Digit of int
-    | `Meta of [ `Left | `Right ] 
-    | `Pagedown
-    | `Pageup
-    | `Return
-    | `Shift
-    | `Tab
-    | `Unknown of int ] 
+type key_sym =
+  [ `Space
+  | `Alt of [ `Left | `Right ]
+  | `Arrow of [ `Down | `Up | `Left | `Right ]
+  | `Backspace
+  | `Capslock
+  | `Ctrl of [ `Left | `Right ]
+  | `End
+  | `Enter
+  | `Escape
+  | `Function of int
+  | `Home
+  | `Letter of char
+  | `Digit of int
+  | `Meta of [ `Left | `Right ] 
+  | `Pagedown
+  | `Pageup
+  | `Return
+  | `Shift
+  | `Tab
+  | `Unknown of int ] 
 
 type key = [ `Down | `Up ] * key_sym
 
-type mouse_button = [ `Left | `Right ]
+type mouse_button = [ `Left | `Right | `Middle | `X1 | `X2 ]
 type mouse = 
   [ `Button of [ `Down | `Up ] * mouse_button * p2 
   | `Motion of p2 * v2 ]
+(** Coordinates are in window normalized coordinates with 
+    (0,0) bot left and (1,1) top right. *) 
 
 type ev = 
   [ `Env of env
