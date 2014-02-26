@@ -4,11 +4,26 @@
    %%NAME%% release %%VERSION%%
   ---------------------------------------------------------------------------*)
 
+open Gg
+
 (** A few common, ad-hoc, tools for Lit's demos. *) 
 
-(** {1 Default keyboard commands} *) 
 
-val command_of_key : App.key_sym -> [ `Toggle_fullscreen | `Exit ] option
+(** {1 Default commands} *) 
+
+
+type cmd = 
+  [ `Init | `Exit | `Resize of size2 | `Tick of float 
+  | `Toggle_fullscreen | `None of App.ev ]
+
+val command_of_key : App.key_sym -> [> `Toggle_fullscreen | `Exit ] option
+
+val event_to_command : App.ev -> cmd 
+
+val ev_of_command_handler : 
+  (App.t -> [> cmd ] -> App.ev_ret) -> App.t -> App.ev -> App.ev_ret
+
+val default_size : size2 
 
 (** {1 Terminal output} *) 
 

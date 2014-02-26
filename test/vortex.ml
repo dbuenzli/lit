@@ -6,8 +6,7 @@
 
 (* Animated vortex. 
 
-   Taken here http://mrdoob.github.com/three.js/examples/webgl_shader.html
-   Equation due to http://badc0de.jiggawatt.org/ *)
+   Pixel shader due to http://badc0de.jiggawatt.org/ *)
 
 open Gg
 open Lit
@@ -78,36 +77,25 @@ let op = { count = 1; effect; tr = M4.id; prim = fullscreen () }
 
 (* Render *) 
          
-let draw r =
-  Renderer.frame_begin r; 
-  Renderer.frame_add r op;
-  Renderer.frame_end r;
-  ()
+let draw r = 
+  Renderer.add_op r op; 
+  Renderer.render r
     
 let command r app = function
+| `None _ -> `Ok
 | `Init -> Demo.show_start r; `Ok 
 | `Exit -> Renderer.release r; Demo.show_stop (); `Quit
 | `Resize size -> Renderer.set_size r size; `Ok 
 | `Toggle_fullscreen -> App.toggle_fullscreen app; `Ok 
-| `Tick now -> 
+| `Tick now ->
     Effect.set_uniform op.effect time now;
     Demo.show_stats now draw r App.update_surface app;
     `Ok
 
-let ev r app e = match (e : App.ev) with
-| `Env (`Init | `Exit | `Resize _ as cmd) -> command r app cmd
-| `Key (`Up, k) -> 
-    begin match Demo.command_of_key k with 
-    | Some cmd -> command r app cmd 
-    | None -> `Ok 
-    end
-| `Tick _ as cmd -> command r app cmd
-| _ -> `Ok
-
 let main () = 
-  let size = V2.v 600. 400. in
+  let size = Demo.default_size in
   let r = Renderer.create ~size (App.select_backend ()) in
-  let ev = ev r in
+  let ev = Demo.ev_of_command_handler (command r) in
   let app = App.create { App.default with App.size = size; tick_hz = 60; ev } in
   App.handle_run app 
   

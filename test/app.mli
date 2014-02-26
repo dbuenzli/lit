@@ -100,6 +100,8 @@ val set_text_ev : t -> bool -> unit
 
 (** {1 Configuration} *) 
 
+type ev_ret = [ `Ok | `Error of string | `Yield | `Quit ]
+
 val select_backend : unit -> (module Lit.Renderer.T)
 
 type config =  
@@ -108,7 +110,7 @@ type config =
     pos : v2; 
     size : size2; 
     name : string; 
-    ev : t -> ev -> [ `Ok | `Error of string | `Yield | `Quit ] } 
+    ev : t -> ev -> ev_ret }
 
 val default : config 
 (** [default] is the default configuration. TODO *)

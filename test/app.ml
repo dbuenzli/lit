@@ -53,6 +53,7 @@ type ev =
   | `Mouse of mouse 
   | `Text of string ]
 
+type ev_ret = [ `Ok | `Error of string | `Yield | `Quit ]
 
 let select_backend () = (module Lit_gl3 : Lit.Renderer.T)
 

@@ -5,15 +5,35 @@
   ---------------------------------------------------------------------------*)
 
 open Lit
+open Gg
 
 let pp = Format.printf 
 
-(* Default keyboard commands *) 
+let default_size = Size2.v 600. 400.
+
+(* Default commands *) 
+
+type cmd = 
+  [ `Init | `Exit | `Resize of size2 | `Tick of float 
+  | `Toggle_fullscreen | `None of App.ev ]
 
 let command_of_key = function
 | `Escape -> Some `Exit
 | `Space -> Some `Toggle_fullscreen
 | _ -> None
+
+let event_to_command = function
+| `Env (`Init | `Exit | `Resize _ as cmd) -> cmd
+| `Key (`Up, k) as e -> 
+    begin match command_of_key k with 
+    | Some cmd -> cmd
+    | None -> `None e
+    end
+| `Tick _ as cmd -> cmd
+| e -> `None e
+
+let ev_of_command_handler cmd_handler =
+  fun app e -> cmd_handler app (event_to_command e)
 
 (* Terminal output *) 
 
