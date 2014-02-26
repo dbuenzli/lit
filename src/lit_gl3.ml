@@ -746,13 +746,49 @@ end
 
 module Effect = struct
   include Renderer.Private.Effect
-  let set_rasterization_state r e = ()
-  let set_depth_state r e = ()
+
+  let set_raster_state r e = match (raster e).raster_cull with 
+  | None -> Gl.disable Gl.cull_face_enum
+  | Some cull -> 
+      Gl.enable Gl.cull_face_enum; 
+      match cull with 
+      | `Front -> Gl.cull_face Gl.front
+      | `Back -> Gl.cull_face Gl.back
+
+  let enum_of_depth_test = function 
+  | `Less ->  Gl.less
+  | `Lequal -> Gl.lequal 
+  | `Never -> Gl.never
+  | `Equal -> Gl.equal
+  | `Greater -> Gl.greater
+  | `Nequal -> Gl.notequal
+  | `Gequal -> Gl.gequal
+  | `Always -> Gl.always
+
+  let set_depth_state r e =
+    let d = depth e in 
+    Gl.depth_mask d.depth_write;
+    match d.depth_test with 
+    | None -> Gl.disable Gl.depth_test
+    | Some test -> 
+        Gl.enable Gl.depth_test;
+        Gl.depth_func (enum_of_depth_test test); 
+        let factor, units = d.depth_offset in 
+        if factor = 0. && units = 0. then Gl.disable Gl.polygon_offset_fill else
+        begin 
+          Gl.enable Gl.polygon_offset_fill; 
+          Gl.polygon_offset factor units
+        end
 end
 
 let init_gl_state r = 
+  (* Raster *)
   Gl.disable Gl.cull_face_enum;
+  (* Depth *)
   Gl.disable Gl.depth_test;
+  Gl.disable Gl.polygon_offset_fill;
+  Gl.depth_func Gl.less;
+  Gl.depth_mask true;
   (* TODO move that to blend state ? *) 
   Gl.enable Gl.blend;
   Gl.blend_equation Gl.func_add; 
@@ -764,13 +800,14 @@ let init_framebuffer r =
   let c = Color.white in 
   Gl.viewport 0 0 w h;
   Gl.clear_color (Color.r c) (Color.g c) (Color.b c) (Color.a c);
-  Gl.clear Gl.color_buffer_bit;
+  Gl.clear_depth 1.;
+  Gl.clear Gl.(color_buffer_bit + depth_buffer_bit);
   ()
 
 let render_op r prog_info op = 
   Prog.bind_prim r prog_info op.prim; 
   Prog.bind_uniforms r prog_info op.effect op;
-  Effect.set_rasterization_state r op.effect; 
+  Effect.set_raster_state r op.effect; 
   Effect.set_depth_state r op.effect; 
   match Prim.index op.prim with
   | None -> 

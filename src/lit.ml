@@ -843,19 +843,45 @@ module View = struct
 end
 
 module Effect = struct  
-  type t = 
-    { prog : Prog.t; 
-      mutable uniforms : Uniform.set; 
-      mutable info : Info.t  } 
 
-  let create prog =
+  (* Rasterization state *) 
+ 
+  type cull = [ `Front | `Back ] 
+  type raster = { raster_cull : cull option } 
+  let default_raster = { raster_cull = None } 
+
+  (* Depth state *) 
+
+  type depth_test = 
+    [ `Never | `Less | `Equal | `Lequal | `Greater | `Nequal 
+    | `Gequal | `Always ]
+
+  type depth = { depth_test : depth_test option; depth_write : bool;
+                 depth_offset : float * float; 
+                 (** factor, units, see glPolygonOffset *) }
+  (** The type for depth state *) 
+
+  let default_depth = { depth_test = Some `Less; depth_write = true; 
+                        depth_offset = (0., 0.) }
+
+
+  type t = 
+    { raster : raster; 
+      depth : depth;
+      prog : Prog.t; 
+      mutable uniforms : Uniform.set; 
+      mutable info : Info.t; } 
+
+  let create ?(raster = default_raster) ?(depth = default_depth) prog =
     let uniforms = Prog.uniforms prog in 
-    { prog; uniforms; info = Info.none }
+    { raster; depth; prog; uniforms; info = Info.none }
            
   let prog e = e.prog
   let uniforms e = e.uniforms 
   let get_uniform e u = Uniform.get e.uniforms u 
   let set_uniform e u v = e.uniforms <- Uniform.def e.uniforms u v
+  let raster e = e.raster
+  let depth e = e.depth
   
   (* Renderer info *) 
 

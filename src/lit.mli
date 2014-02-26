@@ -754,38 +754,42 @@ module Effect : sig
 
       {b Note.} Faces with a counter clockwise orientation are front 
       faces. *) 
-(*
-  type cull = [ `None | `Front | `Back ] 
-  type raster = { cull : cull } 
+
+  type cull = [ `Front | `Back ] 
+  type raster = { raster_cull : cull option } 
   val default_raster : raster
-*)
+  (** [default_raster} is { cull = None }. *) 
+
   (** {1 Depth state} 
 
 
       {b Note.} Depth clearing and depth range are specified 
       in {Camera.t} values. *)
 
-(*
   type depth_test = 
     [ `Never | `Less | `Equal | `Lequal | `Greater | `Nequal 
     | `Gequal | `Always ]
 
-  type depth = { test : depth_test option; 
+  type depth = { depth_test : depth_test option; 
                  (** [Some _] if z-test should be performed (defaults to 
-                     [Some `Lequal] *)
-                 write : bool; 
+                     [Some `Less] *)
+                 depth_write : bool; 
                  (** [true] if z-buffer should be written (default). *)
-                 offset : float * float; 
-                 (** factor, units *) }
+                 depth_offset : float * float; 
+                 (** factor, units, see glPolygonOffset *) }
   (** The type for depth state *) 
 
-  type default_depth : depth
-*)
+  val default_depth : depth
+
+  (** {1 Effect} *) 
 
   type t = effect
   
-  val create : prog -> effect   
-  (** [create prog] is an effect that uses the GPU program [prog]. *) 
+  val create : ?raster:raster -> ?depth:depth -> prog -> effect   
+  (** [create raster depth prog] is an effect that uses the GPU program 
+      [prog]. [raster] defines the rasterization setup (defaults to 
+      {!default_raster}) and depth the depth buffer setup (defaults to 
+      {!default_depth}). *) 
     
   val prog : effect -> prog
   (** [prog e] is [e]'s GPU program. *) 
@@ -799,6 +803,9 @@ module Effect : sig
 
   val set_uniform : effect -> 'a uniform -> 'a -> unit
   (** [set_uniform e u v] sets the value of uniform [u] to [v] in [e]. *) 
+
+  val raster : effect -> raster 
+  val depth : effect -> depth
 end
 
 (** {1 Rendering} *) 
