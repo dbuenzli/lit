@@ -192,7 +192,7 @@ module Prim = struct
       let x0 = -0.5 *. Size2.w size in 
       let y0 = -0.5 *. Size2.h size in
       let vertex_count = (xseg + 1) * (yseg + 1) in
-      let tex_size = if do_tex then 0 else 2 * vertex_count in
+      let tex_size = if do_tex then 2 * vertex_count else 0 in
       let b = Ba.create Bigarray.float32 (3 * vertex_count + tex_size) in
       let i = ref 0 in
       for y = 0 to yseg do 
@@ -204,7 +204,8 @@ module Prim = struct
         done
       done;
       let b = Buf.create (`Bigarray b) in      
-      (Attr.create ~stride:2 ~first:0 Attr.vertex ~dim:3 b) :: 
+      let stride = if do_tex then 2 else 0 in
+      (Attr.create ~stride ~first:0 Attr.vertex ~dim:3 b) :: 
       match tex with 
       | None -> []
       | Some tex -> [ Attr.create ~stride:3 ~first:3 tex ~dim:2 b ]
