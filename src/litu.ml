@@ -116,8 +116,9 @@ module Prim = struct
   module Edge = struct
     type t = int * int                     (* vertex indices for the edges. *) 
     let compare (v0, v1 as v) (u0, u1 as u) =  (* insensitive to direction. *) 
-      if (v0 = u0 && v1 = u1) || (v0 = u1 && v1 = u0) then 0 else
-      compare v u       
+      let v = if v0 < v1 then v else v1, v0 in 
+      let u = if u0 < u1 then u else u1, u0 in 
+      compare v u
   end 
   module Emap = Map.Make (Edge)
 
