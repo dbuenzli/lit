@@ -1077,6 +1077,13 @@ module Renderer : sig
 
   (** {1:renderers Renderers} *)
 
+  type clears = 
+    { clear_color : color option; 
+      clear_depth : float option; 
+      clear_stencil : int option; }
+
+  val default_clears : clears
+
   (** The type for a renderer backend. *) 
   module type T = sig
     type t 
@@ -1088,8 +1095,10 @@ module Renderer : sig
     val set_size : t -> size2 -> unit
     val view : t -> View.t 
     val set_view : t -> View.t -> unit
+    val clears : t -> clears 
+    val set_clears : t -> clears -> unit
     val add_op : t -> op -> unit
-    val render : t -> unit
+    val render : t -> clear:bool -> unit
     val release : t -> unit
 
     module Cap : sig
@@ -1119,8 +1128,10 @@ module Renderer : sig
   val set_size : renderer -> size2 -> unit
   val view : renderer -> View.t
   val set_view : renderer -> View.t -> unit
+  val clears : t -> clears 
+  val set_clears : t -> clears -> unit
   val add_op : renderer -> op -> unit
-  val render : renderer -> unit
+  val render : ?clear:bool -> renderer -> unit
   val release : renderer -> unit
   
   (** Renderer capabilities. *)

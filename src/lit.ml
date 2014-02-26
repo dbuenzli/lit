@@ -1010,20 +1010,30 @@ module Renderer = struct
       if s.faces > s.max_faces then s.max_faces <- s.faces
   end
   
+  type clears = 
+    { clear_color : color option; 
+      clear_depth : float option; 
+      clear_stencil : int option; }
+
+  let default_clears = 
+    { clear_color = Some Color.black;
+      clear_depth = Some 1.; 
+      clear_stencil = None; }
+                         
   module type T = sig
-    type t
+    type t 
     val name : string
-
     val create : 
-      ?compiler_msg_parser:Log.compiler_msg_parser -> Log.t -> 
-      debug:bool -> size2 -> t
-
+      ?compiler_msg_parser:Log.compiler_msg_parser -> Log.t -> debug:bool -> 
+      size2 -> t
     val size : t -> size2
     val set_size : t -> size2 -> unit
     val view : t -> View.t 
     val set_view : t -> View.t -> unit
-    val add_op : t -> op -> unit 
-    val render : t -> unit
+    val clears : t -> clears 
+    val set_clears : t -> clears -> unit
+    val add_op : t -> op -> unit
+    val render : t -> clear:bool -> unit
     val release : t -> unit
 
     module Cap : sig
@@ -1056,8 +1066,10 @@ module Renderer = struct
   let set_size (R ((module R), r)) size = R.set_size r size
   let view (R ((module R), r)) = R.view r 
   let set_view (R ((module R), r)) v = R.set_view r v
+  let clears (R ((module R), r)) = R.clears r 
+  let set_clears (R ((module R), r)) clears = R.set_clears r clears
   let add_op (R ((module R), r)) op = R.add_op r op
-  let render (R ((module R), r)) = R.render r
+  let render ?(clear = true) (R ((module R), r)) = R.render r ~clear
   let release (R ((module R), r)) = R.release r
 
   module Cap = struct

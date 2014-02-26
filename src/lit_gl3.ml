@@ -106,6 +106,7 @@ type t =
     mutable debug : bool;
     mutable log : Log.t; 
     mutable compiler_msg_parser : Log.compiler_msg_parser;
+    mutable clears : Renderer.clears;
     mutable size : size2;
     mutable view : view;
     mutable world_to_clip : m4 Lazy.t; (* cache *) 
@@ -782,6 +783,7 @@ module Effect = struct
 end
 
 let init_gl_state r = 
+  Gl.enable Gl.scissor_test;
   (* Raster *)
   Gl.disable Gl.cull_face_enum;
   (* Depth *)
@@ -794,14 +796,38 @@ let init_gl_state r =
   Gl.blend_equation Gl.func_add; 
   Gl.blend_func Gl.src_alpha Gl.one_minus_src_alpha
 
-let init_framebuffer r = 
-  let w = Float.int_of_round (Size2.w r.size) in 
-  let h = Float.int_of_round (Size2.h r.size) in
-  let c = Color.white in 
-  Gl.viewport 0 0 w h;
-  Gl.clear_color (Color.r c) (Color.g c) (Color.b c) (Color.a c);
-  Gl.clear_depth 1.;
-  Gl.clear Gl.(color_buffer_bit + depth_buffer_bit);
+let init_framebuffer r clear =
+  let viewport = View.viewport r.view in
+  let o = V2.mul (Box2.o viewport) r.size in
+  let ox = Float.int_of_round (P2.x o) in
+  let oy = Float.int_of_round (P2.x o) in
+  let size = V2.mul (Box2.size viewport) r.size in
+  let w = Float.int_of_round (Size2.w size) in 
+  let h = Float.int_of_round (Size2.h size) in 
+  Gl.viewport ox oy w h; 
+  Gl.scissor ox oy w h;
+  if clear then begin 
+    let clears = ref 0 in 
+    begin match r.clears.Renderer.clear_color with 
+    | None -> () 
+    | Some c -> 
+        Gl.clear_color (Color.r c) (Color.g c) (Color.b c) (Color.a c);
+        clears := Gl.(!clears + color_buffer_bit)
+    end;
+    begin match r.clears.Renderer.clear_depth with 
+    | None -> () 
+    | Some d -> 
+        Gl.clear_depth 1.; 
+        clears := Gl.(!clears + depth_buffer_bit)
+    end;
+    begin match r.clears.Renderer.clear_stencil with 
+    | None -> () 
+    | Some s -> 
+        Gl.clear_stencil s; 
+        clears := Gl.(!clears + stencil_buffer_bit)
+    end;
+    if !clears <> 0 then Gl.clear !clears
+  end;
   ()
 
 let render_op r prog_info op = 
@@ -848,6 +874,7 @@ let create ?compiler_msg_parser log ~debug size =
   in
   { init = false;
     debug; log; compiler_msg_parser; 
+    clears = Renderer.default_clears;
     size; 
     view = View.create ();
     world_to_clip = lazy M4.id;
@@ -863,7 +890,11 @@ let view r = r.view
 let set_view r view = 
   r.view <- view;
   r.world_to_clip <- lazy (M4.mul (View.proj view) (View.tr view))
-      
+
+let clears r = r.clears 
+let set_clears r clears = r.clears <- clears
+
+
 let add_op r op =  
   if not r.init then (r.init <- true; init r);
   match Prog.setup r (Effect.prog op.effect) with 
@@ -873,9 +904,9 @@ let add_op r op =
       r.batches <- Imap.add prog_id (op :: batches) r.batches; 
       Prim.setup r op.prim
 
-let render r =
+let render r ~clear =
   if not r.init then (r.init <- true; init r);
-  init_framebuffer r;
+  init_framebuffer r clear;
   let batches = r.batches in 
   r.batches <- Imap.empty;
   Imap.iter (render_batch r) batches;
