@@ -18,8 +18,3 @@
 
 * Renderer.Uniform.builtin : Uniform.builtin -> value_untyped 
   (* For debugging *) 
-* Renderer.set_view v
-  Renderer.set_clears
-  Renderer.add_op 
-  Renderer.render 
-

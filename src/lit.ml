@@ -1022,9 +1022,8 @@ module Renderer = struct
     val set_size : t -> size2 -> unit
     val view : t -> View.t 
     val set_view : t -> View.t -> unit
-    val frame_begin : t -> unit
-    val frame_add : t -> op -> unit 
-    val frame_end : t -> unit
+    val add_op : t -> op -> unit 
+    val render : t -> unit
     val release : t -> unit
 
     module Cap : sig
@@ -1056,10 +1055,9 @@ module Renderer = struct
   let size (R ((module R), r)) = R.size r
   let set_size (R ((module R), r)) size = R.set_size r size
   let view (R ((module R), r)) = R.view r 
-  let set_view (R ((module R), r)) v = R.set_view r v           
-  let frame_begin (R ((module R), r)) = R.frame_begin r 
-  let frame_add (R ((module R), r)) op = R.frame_add r op
-  let frame_end (R ((module R), r)) = R.frame_end r
+  let set_view (R ((module R), r)) v = R.set_view r v
+  let add_op (R ((module R), r)) op = R.add_op r op
+  let render (R ((module R), r)) = R.render r
   let release (R ((module R), r)) = R.release r
 
   module Cap = struct

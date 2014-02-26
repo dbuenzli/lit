@@ -864,17 +864,17 @@ let set_view r view =
   r.view <- view;
   r.world_to_clip <- lazy (M4.mul (View.proj view) (View.tr view))
       
-let frame_begin r = 
-  if not r.init then (r.init <- true; init r)
-  
-let frame_add r op = match Prog.setup r (Effect.prog op.effect) with 
-| `Error -> () 
-| `Ok prog_id -> 
-    let batches = try Imap.find prog_id r.batches with Not_found -> [] in
-    r.batches <- Imap.add prog_id (op :: batches) r.batches; 
-    Prim.setup r op.prim
+let add_op r op =  
+  if not r.init then (r.init <- true; init r);
+  match Prog.setup r (Effect.prog op.effect) with 
+  | `Error -> () 
+  | `Ok prog_id -> 
+      let batches = try Imap.find prog_id r.batches with Not_found -> [] in
+      r.batches <- Imap.add prog_id (op :: batches) r.batches; 
+      Prim.setup r op.prim
 
-let frame_end r =
+let render r =
+  if not r.init then (r.init <- true; init r);
   init_framebuffer r;
   let batches = r.batches in 
   r.batches <- Imap.empty;

@@ -1088,9 +1088,8 @@ module Renderer : sig
     val set_size : t -> size2 -> unit
     val view : t -> View.t 
     val set_view : t -> View.t -> unit
-    val frame_begin : t -> unit
-    val frame_add : t -> op -> unit
-    val frame_end : t -> unit
+    val add_op : t -> op -> unit
+    val render : t -> unit
     val release : t -> unit
 
     module Cap : sig
@@ -1120,9 +1119,8 @@ module Renderer : sig
   val set_size : renderer -> size2 -> unit
   val view : renderer -> View.t
   val set_view : renderer -> View.t -> unit
-  val frame_begin : renderer -> unit
-  val frame_add : renderer -> op -> unit
-  val frame_end : renderer -> unit
+  val add_op : renderer -> op -> unit
+  val render : renderer -> unit
   val release : renderer -> unit
   
   (** Renderer capabilities. *)
