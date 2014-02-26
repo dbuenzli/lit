@@ -758,10 +758,9 @@ module Effect : sig
   type cull = [ `Front | `Back ] 
   type raster = { raster_cull : cull option } 
   val default_raster : raster
-  (** [default_raster} is { cull = None }. *) 
+  (** [default_raster] is [{ cull = None }]. *) 
 
   (** {1 Depth state} 
-
 
       {b Note.} Depth clearing and depth range are specified 
       in {Camera.t} values. *)

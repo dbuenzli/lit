@@ -80,8 +80,8 @@ module Prim : sig
 
 end
 
-(** Higher level effects. *) 
-module Effects : sig
+(** Useful effects. *) 
+module Effect : sig
 
   (** Triangles as wireframes.
 
@@ -101,6 +101,9 @@ module Effects : sig
     val model_to_clip : M4.t uniform 
     (** [model_to_clip] is the model to clip space transform matrix, 
         defaults to the [`Model_to_clip] built-in. *)
+        
+    val viewport_size : Size2.t uniform 
+    (** TODO *) 
 
     val fill_color : Color.t uniform 
     (** [fill_color] is the triangle's fill color, default to 
@@ -117,7 +120,8 @@ module Effects : sig
     (** [wire_only], if [true] only the wireframe is shown, defaults to 
         [false]. *) 
     
-    val create : ?fill_color:Color.t -> ?wire_color:Color.t -> 
+    val create : ?raster:Effect.raster -> ?depth:Effect.depth -> 
+      ?fill_color:Color.t -> ?wire_color:Color.t -> 
       ?wire_width:float -> ?wire_only:bool -> unit -> Effect.t
     (** [create ()] is a new wireframe effect, the optional parameters
         can be used to preset the uniforms. *)

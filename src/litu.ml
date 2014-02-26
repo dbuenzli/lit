@@ -321,21 +321,101 @@ module Prim = struct
         
 end
 
-module Effects = struct
-  
+module Effect = struct
+
   module Wireframe = struct
 
-    let model_to_clip = Uniform.model_to_clip "model_to_clip" 
-    let fill_color = Uniform.v4 "fill_color" Color.white
-    let wire_color = Uniform.v4 "wire_color" Color.black
-    let wire_width = Uniform.float "wire_width" 1.
-    let wire_only = Uniform.bool "wire_only" false
+    (* Effect adapted from http://cgg-journal.com/2008-2/06/index.html. *)
 
-    let create ?fill_color ?wire_color ?wire_width ?wire_only () = 
-      failwith "TODO"
+    module U = struct 
+      let model_to_clip = Uniform.model_to_clip "model_to_clip" 
+      let viewport_size = Uniform.viewport_size "vp_size" 
+      let fill_color = Uniform.v4 "fill_color" Color.white
+      let wire_color = Uniform.v4 "wire_color" Color.black
+      let wire_width = Uniform.float "wire_width" 1.
+      let wire_only = Uniform.bool "wire_only" false
+    end
+
+    let uset = 
+      Uniform.(empty + U.model_to_clip + U.viewport_size + U.fill_color + 
+               U.wire_color + U. wire_width + U.wire_only)
+               
+    let program = Prog.create ~uset [
+        Prog.shader `Vertex "
+        uniform mat4 model_to_clip;
+        in vec4 vertex;
+        out vec4 v_vertex;
+        void main() { gl_Position = model_to_clip * vertex; }"; 
+
+        Prog.shader `Geometry "
+        layout(triangles) in;
+        layout(triangle_strip, max_vertices=3) out;
+
+        uniform vec2 vp_size;
+        noperspective out vec3 dist;
+
+        void main(void)
+        {
+           vec2 p0 = vp_size * gl_in[0].gl_Position.xy/gl_in[0].gl_Position.w;
+           vec2 p1 = vp_size * gl_in[1].gl_Position.xy/gl_in[1].gl_Position.w;
+           vec2 p2 = vp_size * gl_in[2].gl_Position.xy/gl_in[2].gl_Position.w;
+  
+           vec2 v0 = p2 - p1;
+           vec2 v1 = p2 - p0;
+           vec2 v2 = p1 - p0;
+           float area = abs(v1.x * v2.y - v1.y * v2.x);
+
+           dist = vec3(area / length(v0), 0, 0);
+           gl_Position = gl_in[0].gl_Position;
+           EmitVertex();
+	
+           dist = vec3(0, area / length(v1), 0);
+           gl_Position = gl_in[1].gl_Position;
+           EmitVertex();
+
+           dist = vec3(0, 0, area / length(v2));
+           gl_Position = gl_in[2].gl_Position;
+           EmitVertex();
+
+           EndPrimitive();
+         }"; 
+
+        Prog.shader `Fragment "
+        uniform bool wire_only;
+        uniform float wire_width;
+        uniform vec4 wire_color;
+        uniform vec4 fill_color; 
+
+        noperspective in vec3 dist;
+        out vec4 color;
+
+        void main(void)
+        {
+          float d = min(dist[0],min(dist[1],dist[2]));
+          float I = exp2(-(2 / wire_width) * d * d);
+          if (wire_only)
+          {
+            color = I * wire_color;
+          } else {
+            color = vec4(I * wire_color.rgb + (1.0 - I) * fill_color.rgb, 
+                         fill_color.a);
+          }
+        }" ]
+          
+    let create ?raster ?depth ?fill_color ?wire_color ?wire_width 
+        ?wire_only () = 
+      let effect = Effect.create ?raster ?depth program in
+      let set k v = match v with
+      | None -> () | Some v -> Effect.set_uniform effect k v
+      in
+      set U.fill_color fill_color;
+      set U.wire_color wire_color;
+      set U.wire_width wire_width;
+      set U.wire_only wire_only;
+      effect
+      
+    include U
   end
-
-
 end
 
 
