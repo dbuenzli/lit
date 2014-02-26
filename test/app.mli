@@ -48,29 +48,30 @@ type mode = [ `Windowed | `Fullscreen ]
 type env = [ `Init | `Exit | `Yield | `Resize of size2 
            | `Mode of mode ] 
 
-type key_sym =
-  [ `Space
-  | `Alt of [ `Left | `Right ]
-  | `Arrow of [ `Down | `Up | `Left | `Right ]
-  | `Backspace
-  | `Capslock
+type keysym =
+  [ `Alt of [ `Left | `Right ]
+  | `Arrow of [ `Up | `Down | `Left | `Right ]
+  | `Backspace 
   | `Ctrl of [ `Left | `Right ]
+  | `Digit of int
   | `End
   | `Enter
   | `Escape
   | `Function of int
   | `Home
-  | `Letter of char
-  | `Digit of int
   | `Meta of [ `Left | `Right ] 
-  | `Pagedown
-  | `Pageup
+  | `Page of [ `Up | `Down ]
   | `Return
-  | `Shift
+  | `Shift of [ `Left | `Right ]
+  | `Space
   | `Tab
-  | `Unknown of int ] 
+  | `Uchar of int
+  | `Unknown of int ]
 
-type key = [ `Down | `Up ] * key_sym
+val keysym_to_string : keysym -> string
+val pp_keysym : Format.formatter -> keysym -> unit
+
+type key = [ `Down | `Up ] * keysym
 
 type mouse_button = [ `Left | `Right | `Middle | `X1 | `X2 ]
 type mouse = 

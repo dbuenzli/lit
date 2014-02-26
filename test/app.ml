@@ -17,29 +17,27 @@ type mode = [ `Windowed | `Fullscreen ]
 type env = [ `Init | `Exit | `Yield | `Resize of size2 
            | `Mode of mode ] 
 
-type key_sym = [ 
-    | `Space
-    | `Alt of [ `Left | `Right ]
-    | `Arrow of [ `Down | `Up | `Left | `Right ]
-    | `Backspace
-    | `Capslock
-    | `Ctrl of [ `Left | `Right ]
-    | `End
-    | `Enter
-    | `Escape
-    | `Function of int
-    | `Home
-    | `Letter of char
-    | `Digit of int
-    | `Meta of [ `Left | `Right ] 
-    | `Pagedown
-    | `Pageup
-    | `Return
-    | `Shift
-    | `Tab
-    | `Unknown of int ] 
+type keysym = 
+  [ `Alt of [ `Left | `Right ]
+  | `Arrow of [ `Up | `Down | `Left | `Right ]
+  | `Backspace 
+  | `Ctrl of [ `Left | `Right ]
+  | `Digit of int
+  | `End
+  | `Enter
+  | `Escape
+  | `Function of int
+  | `Home
+  | `Meta of [ `Left | `Right ] 
+  | `Page of [ `Up | `Down ]
+  | `Return
+  | `Shift of [ `Left | `Right ]
+  | `Space
+  | `Tab
+  | `Uchar of int
+  | `Unknown of int ]
 
-type key = [ `Down | `Up ] * key_sym
+type key = [ `Down | `Up ] * keysym
 
 type mouse_button = [ `Left | `Right | `Middle | `X1 | `X2 ]
 type mouse = 
@@ -129,7 +127,6 @@ let time f x =
   let dt = Int64.sub (tick_now ()) start in
   v, Int64.(to_float dt) /. pfreq
 
-
 (* Window management *) 
 
 let create_window c =
@@ -181,16 +178,82 @@ let text_input_ev app e =
   let text = Sdl.Event.(get e text_input_text) in
   callback_ev app (`Text text)
 
+
+let keysym_to_string (ksym : keysym) = 
+  let dir_to_string = function 
+  | `Left -> "left" | `Right -> "right" | `Up -> "up" | `Down -> "down"
+  in
+  match ksym with
+  | `Alt dir -> str "alt_%s" (dir_to_string dir)
+  | `Arrow dir -> str "arrow_%s" (dir_to_string dir)
+  | `Backspace -> "backspace"
+  | `Ctrl dir -> str "ctrl_%s" (dir_to_string dir)
+  | `Digit d -> str "digit_%d" d
+  | `End -> "end"
+  | `Enter -> "enter"
+  | `Escape -> "escape" 
+  | `Function n -> str "f%d" n
+  | `Home -> "home" 
+  | `Meta dir -> str "meta_%s" (dir_to_string dir)
+  | `Page dir -> str "page_%s" (dir_to_string dir)
+  | `Return -> "return"
+  | `Shift dir -> str "shift_%s" (dir_to_string dir)
+  | `Space -> "space"
+  | `Tab -> "tab" 
+  | `Uchar u -> str "U+%04X" u
+  | `Unknown u -> str "unknown (%X)" u 
+
+let pp_keysym ppf ksym = Format.fprintf ppf "%s" (keysym_to_string ksym)
+
+let keysym_of_keycode = 
+  let module Imap = Map.Make (Int32) in
+  let map = [
+    Sdl.K.lalt, `Alt `Left; Sdl.K.ralt, `Alt `Right;
+    Sdl.K.up, `Arrow `Up; Sdl.K.down, `Arrow `Down; 
+    Sdl.K.left, `Arrow `Left; Sdl.K.right, `Arrow `Right;
+    Sdl.K.backspace, `Backspace; 
+    Sdl.K.lctrl, `Ctrl `Left; Sdl.K.rctrl, `Ctrl `Right; 
+    Sdl.K.k0, `Digit 0; Sdl.K.k1, `Digit 1; Sdl.K.k2, `Digit 2;
+    Sdl.K.k3, `Digit 3; Sdl.K.k4, `Digit 4; Sdl.K.k5, `Digit 5;
+    Sdl.K.k6, `Digit 6; Sdl.K.k7, `Digit 7; Sdl.K.k8, `Digit 8;
+    Sdl.K.k9, `Digit 9;
+    Sdl.K.kp_0, `Digit 0; Sdl.K.kp_1, `Digit 1; Sdl.K.kp_2, `Digit 2;
+    Sdl.K.kp_3, `Digit 3; Sdl.K.kp_4, `Digit 4; Sdl.K.kp_5, `Digit 5;
+    Sdl.K.kp_6, `Digit 6; Sdl.K.kp_7, `Digit 7; Sdl.K.kp_8, `Digit 8;
+    Sdl.K.kp_9, `Digit 9;
+    Sdl.K.kend, `End;
+    Sdl.K.kp_enter, `Enter;
+    Sdl.K.escape, `Escape;
+    Sdl.K.f1, `Function 1; Sdl.K.f2, `Function 2; Sdl.K.f3, `Function 3; 
+    Sdl.K.f4, `Function 4; Sdl.K.f5, `Function 5; Sdl.K.f6, `Function 6; 
+    Sdl.K.f7, `Function 7; Sdl.K.f8, `Function 8; Sdl.K.f9, `Function 9; 
+    Sdl.K.f10, `Function 10; Sdl.K.f11, `Function 11; Sdl.K.f12, `Function 12; 
+    Sdl.K.f13, `Function 13; Sdl.K.f14, `Function 14; Sdl.K.f15, `Function 15; 
+    Sdl.K.f16, `Function 16; Sdl.K.f17, `Function 17; Sdl.K.f18, `Function 18; 
+    Sdl.K.f19, `Function 19; Sdl.K.f20, `Function 20; Sdl.K.f21, `Function 21; 
+    Sdl.K.f22, `Function 22; Sdl.K.f23, `Function 23; Sdl.K.f24, `Function 24; 
+    Sdl.K.home, `Home;
+    Sdl.K.lgui, `Meta `Left; Sdl.K.rgui, `Meta `Right; 
+    Sdl.K.pagedown, `Page `Down; 
+    Sdl.K.pageup, `Page `Up; 
+    Sdl.K.return, `Return; 
+    Sdl.K.lshift, `Shift `Left; Sdl.K.rshift, `Shift `Right; 
+    Sdl.K.space, `Space; 
+    Sdl.K.tab, `Tab; ]
+  in 
+  let m = List.fold_left (fun acc (k, v) -> Imap.add k v acc) Imap.empty map in
+  fun kc -> try Imap.find kc m with 
+  | Not_found -> 
+      if Int32.shift_right kc 30 = 1l then `Unknown (Int32.to_int kc) else
+      `Uchar (Int32.to_int kc)
+      
+let keyboard_ev app e state =
+  let keysym = keysym_of_keycode (Sdl.Event.(get e keyboard_keycode)) in
+  callback_ev app (`Key (state, keysym))
+
 let window_ev app e = 
   match Sdl.Event.(window_event_enum (get e window_event_id)) with
   | `Exposed | `Resized -> callback_ev app (`Env (`Resize (size app)))
-  | _ -> ()
-
-let keyboard_ev app e state =
-  let key_scancode e = Sdl.Scancode.enum Sdl.Event.(get e keyboard_scancode) in
-  match key_scancode e with 
-  | `Escape -> callback_ev app (`Key (state, `Escape))
-  | `Space -> callback_ev app (`Key (state, `Space))
   | _ -> ()
 
 let mouse_button_ev app e state =   
