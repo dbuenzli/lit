@@ -816,6 +816,30 @@ module View = struct
   let set_proj v m = v.proj <- m
   let viewport v = v.viewport 
   let set_viewport v b = v.viewport <- b
+
+
+  (* Coordinate system transforms *) 
+      
+
+  let viewport_of_surface view nsc =
+    V2.(div (nsc - Box2.o view.viewport) (Box2.size view.viewport))
+      
+  let viewport_of_ndc view ndc =
+    V2.(0.5 * (ndc + Size2.unit))
+
+  let surface_of_viewport view nvpc =
+    V2.((Box2.o view.viewport) + (mul nvpc (Box2.size view.viewport)))
+                              
+  let surface_of_ndc view ndc =
+    let nvpc = V2.(0.5 * (ndc + Size2.unit)) in
+    surface_of_viewport view nvpc
+
+  let ndc_of_viewport view nvpc = 
+    V2.(2. * nvpc - Size2.unit)
+
+  let ndc_of_surface view nsc =
+    let nvpc = viewport_of_surface view nsc in
+    ndc_of_viewport view nvpc
 end
 
 module Effect = struct  

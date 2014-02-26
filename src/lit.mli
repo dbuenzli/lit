@@ -851,6 +851,35 @@ module View : sig
   val viewport : view -> box2 
   val set_viewport : view -> box2 -> unit 
     
+
+  (** {1 Coordinate system transforms} 
+      
+      TODO explain in detail coordinate systems *)
+
+  val viewport_of_surface : view -> p2 -> p2 
+  (** [viewport_of_surface view pt] is the normalized viewport coordinates
+      in [view] of the normalized surface coordinates [pt]. *) 
+
+  val viewport_of_ndc : view -> p2 -> p2 
+  (** [viewport_of_ndc view pt] is the normalized viewport coordinates
+      in [view] of the normalized device coordinates [pt] in [view]. *) 
+
+  val surface_of_viewport : view -> p2 -> p2 
+  (** [surface_of_viewport view pt] is the normalized surface coordinates
+      of the normalized viewport coordinates [pt] in [view]. *) 
+
+  val surface_of_ndc : view -> p2 -> p2 
+  (** [surface_of_ndc view pt] is the normalized surface coordinates
+      of the normalized device coordinates [pt] in [view]. *) 
+
+  val ndc_of_viewport : view -> p2 -> p2 
+  (** [ndc_of_viewport view pt] is the normalized device coordinates
+      in [view] of the normalized viewport coordinates [pt] in [view]. *) 
+
+  val ndc_of_surface : view -> p2 -> p2 
+  (** [ndc_of_surface view pt] is the normalized device coordinates
+      of the normalized surface coordinates [pt] in [view]. *) 
+
   (** {1 Projections and view matrices} *)
        
   type fov = [ `H of float | `V of float ] 
