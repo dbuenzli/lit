@@ -82,7 +82,6 @@ let draw r =
   Renderer.render r
     
 let command r app = function
-| `None _ -> `Ok
 | `Init -> Demo.show_start r; `Ok 
 | `Exit -> Renderer.release r; Demo.show_stop (); `Quit
 | `Resize size -> Renderer.set_size r size; `Ok 
@@ -91,6 +90,7 @@ let command r app = function
     Effect.set_uniform op.effect time now;
     Demo.show_stats now draw r App.update_surface app;
     `Ok
+| _ -> `Ok 
 
 let main () = 
   let size = Demo.default_size in

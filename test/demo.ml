@@ -11,15 +11,35 @@ let pp = Format.printf
 
 let default_size = Size2.v 600. 400.
 
+(* Primitive cycler *) 
+
+let prim_cycler ?(normals = false) ?prims () = 
+  let prims = match prims with 
+  | Some [] -> invalid_arg "prims is the empty list"
+  | Some prims -> prims 
+  | None -> 
+      let with_normals p = if normals then Litu.Prim.with_normals p else p in
+      [ lazy (with_normals (Litu.Prim.cube 1.)); 
+        lazy (with_normals (Litu.Prim.sphere ~level:4 0.5)); 
+        lazy (with_normals (Litu.Prim.rect (Size2.v 1. 1.))) ]
+  in
+  let cycle = ref prims in
+  let rec loop () = match !cycle with 
+  | [] -> cycle := prims; loop () 
+  | p :: ps -> cycle := ps; Lazy.force p
+  in
+  loop 
+
 (* Default commands *) 
 
 type cmd = 
   [ `Init | `Exit | `Resize of size2 | `Tick of float 
-  | `Toggle_fullscreen | `None of App.ev ]
+  | `Toggle_fullscreen | `Cycle_prim | `None of App.ev ]
 
 let command_of_key = function
 | `Escape -> Some `Exit
 | `Space -> Some `Toggle_fullscreen
+| `Digit 1 -> Some `Cycle_prim
 | _ -> None
 
 let event_to_command = function
