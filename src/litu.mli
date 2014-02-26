@@ -124,6 +124,17 @@ module Effects : sig
   end
 end
 
+(** 3D space manipulators *) 
+module Manip : sig
+
+  type rot 
+  (** The type for rotation manipulators. *) 
+
+  val rot : ?center:p2 -> ?radius:float -> ?init:quat -> start:p2 -> unit -> 
+    rot    
+  val rot_update : rot -> p2 -> quat 
+end
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2014 Daniel C. Bünzli.
    All rights reserved.

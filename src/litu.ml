@@ -338,6 +338,35 @@ module Effects = struct
 
 end
 
+
+module Manip = struct
+
+  open Gg
+
+  type rot = 
+    { center : p2; 
+      radius : float; 
+      start : p3; 
+      init : quat }
+    
+  let sphere_point r c pt = 
+    let inv_r = 1. /. r in
+    let p = V2.(inv_r * (pt - c)) in 
+    let d = V2.norm2 pt in 
+    if d <= 1. then V3.of_v2 p ~z:(sqrt (1. -. d)) else 
+    let a = 1. /. sqrt d in 
+    V3.of_v2  V2.(a * p) ~z:0.0 
+      
+  let rot ?(center = P2.o) ?(radius = 1.0) ?(init = Quat.id) ~start () = 
+    { center; radius; start = sphere_point radius center start; init }
+    
+  let rot_update r pt =
+    let p = sphere_point r.radius r.center pt in 
+    let q = V4.of_v3 V3.(cross r.start p) ~w:V3.(dot r.start p) in
+    Quat.mul q r.init
+end
+
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2014 Daniel C. Bünzli.
    All rights reserved.
