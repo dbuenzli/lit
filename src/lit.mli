@@ -27,10 +27,23 @@ type buf
 (** A few bigarray helpers. *) 
 module Ba : sig
 
-  (** {1:create Creation} *)
+  (** {1:ba Bigarrays} *)
   
   val create : ('a, 'b) Bigarray.kind -> int -> ('a, 'b) bigarray 
   (** [create k count] is a bigarray of kind [k] with [count] scalars. *)
+
+  val length : ('a, 'b) bigarray -> int 
+  (** [length b] is the length of [b]. *) 
+
+  val pp : ?count:int -> ?stride:int -> ?first:int -> ?dim:int ->
+    pp_scalar:(Format.formatter -> 'a -> unit) ->
+    Format.formatter -> ('a, 'b) bigarray -> unit
+  (** [pp limit stride first dim pp_scalar ppf b] prints on [ppf], 
+      [count] groups of size [dim] of scalars of [b], starting at [first]
+      using [pp_scalar], and skipping [stride] scalars between two groups.
+      If [limit] is unspecified prints as much as possible [stride] and [first]
+      defaults to [0] and [dim] to [1]. *)
+
 
   (** {1:get Getting} 
 

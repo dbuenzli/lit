@@ -57,7 +57,27 @@ end
 type ('a, 'b) bigarray = ('a, 'b, Bigarray.c_layout) Bigarray.Array1.t
 
 module Ba = struct
+
   let create k count = Bigarray.Array1.create k Bigarray.c_layout count 
+  let length b = Bigarray.Array1.dim b
+
+  let pp ?count ?(stride = 0) ?(first = 0) ?(dim = 1) ~pp_scalar ppf ba = 
+    (* TODO invalid args *) 
+    let count = match count with 
+    | Some count -> count 
+    | None -> ((length ba + stride) - first) / (dim + stride) 
+    in
+    let i = ref first in
+    let pp_group ppf () = 
+      pp ppf "@[(%a" pp_scalar ba.{!i}; 
+      for c = 1 to dim - 1 do pp ppf "@ %a" pp_scalar ba.{!i + c} done;
+      pp ppf ")@]";
+      i := !i + dim + stride 
+    in
+    pp ppf "@[<hov>%a" pp_group ();
+    for k = 1 to count - 1 do pp ppf "@ %a" pp_group (); done;
+    pp ppf "@]"
+
 
   (* Get *)
 
