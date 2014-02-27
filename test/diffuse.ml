@@ -75,6 +75,9 @@ let draw r =
   Renderer.render r
 
 let resize r size =
+  let clears = { Renderer.default_clears with 
+                 Renderer.clear_color = Some Color.white }
+  in
   let aspect = Size2.w size /. Size2.h size in
   let view = 
     let tr = View.look ~at:P3.o ~from:(P3.v 0. 0. 5.) () in 
@@ -84,6 +87,7 @@ let resize r size =
   in
   Renderer.set_size r size;
   Renderer.set_view r view;  
+  Renderer.set_clears r clears;
   ()
 
 let draw r app = draw r; App.update_surface app
@@ -119,8 +123,6 @@ let rec command r app = function
 let main () = 
   let size = Demo.default_size in
   let r = Renderer.create ~size (App.select_backend ()) in
-  let clears = Renderer.({ default_clears with clear_color = Some Color.white }) in
-  let () = Renderer.set_clears r clears in
   let ev = Demo.ev_of_command_handler (command r) in
   let app = App.create { App.default with App.size = size; tick_hz = 0; ev } in
   App.handle_run app 

@@ -44,7 +44,6 @@ module Ba : sig
       If [limit] is unspecified prints as much as possible [stride] and [first]
       defaults to [0] and [dim] to [1]. *)
 
-
   (** {1:get Getting} 
 
       {b Warning} These functions are not very efficient. Use for 

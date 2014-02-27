@@ -205,8 +205,13 @@ let keysym_to_string (ksym : keysym) =
 
 let pp_keysym ppf ksym = Format.fprintf ppf "%s" (keysym_to_string ksym)
 
+module Int = struct 
+  type t = int 
+  let compare : int -> int -> int = Pervasives.compare 
+end
+
 let keysym_of_keycode = 
-  let module Imap = Map.Make (Int32) in
+  let module Imap = Map.Make (Int) in
   let map = [
     Sdl.K.lalt, `Alt `Left; Sdl.K.ralt, `Alt `Right;
     Sdl.K.up, `Arrow `Up; Sdl.K.down, `Arrow `Down; 
@@ -244,8 +249,7 @@ let keysym_of_keycode =
   let m = List.fold_left (fun acc (k, v) -> Imap.add k v acc) Imap.empty map in
   fun kc -> try Imap.find kc m with 
   | Not_found -> 
-      if Int32.shift_right kc 30 = 1l then `Unknown (Int32.to_int kc) else
-      `Uchar (Int32.to_int kc)
+      if kc land Sdl.K.scancode_mask > 0 then `Unknown kc else `Uchar kc
       
 let keyboard_ev app e state =
   let keysym = keysym_of_keycode (Sdl.Event.(get e keyboard_keycode)) in
