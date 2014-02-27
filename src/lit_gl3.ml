@@ -42,6 +42,11 @@ module Gl_hi = struct                         (* Wraps a few Gl functions. *)
   let gen_vertex_array () = get_int (Gl.gen_vertex_arrays 1) 
   let delete_vertex_array id = set_int (Gl.delete_vertex_arrays 1) id
 
+  (* Texture objects *) 
+
+  let gen_texture () = get_int (Gl.gen_textures 1) 
+  let delete_texture id = set_int (Gl.delete_textures 1) id
+
   (* Shader objects *) 
 
   let get_shader_int sid e = get_int (Gl.get_shaderiv sid e)
@@ -302,6 +307,169 @@ module Prim = struct
       (* attrs are bound later, see Prog.bind_prim *) 
       Gl.bind_vertex_array 0; 
       Gl.bind_buffer Gl.element_array_buffer 0
+end
+
+(* Textures *) 
+
+module Tex = struct
+  include Renderer.Private.Tex
+
+  let target_enum_of_kind = function 
+  | `D1 -> Gl.texture_1d 
+  | `D2 -> Gl.texture_2d 
+  | `D3 -> Gl.texture_3d 
+  | `Buffer -> Gl.texture_buffer
+
+  let enum_of_min_filter = function 
+  | `Linear -> Gl.linear
+  | `Linear_mipmap_linear -> Gl.linear_mipmap_linear
+  | `Linear_mipmap_nearest -> Gl.linear_mipmap_nearest
+  | `Nearest -> Gl.nearest
+  | `Nearest_mipmap_linear -> Gl.nearest_mipmap_linear
+  | `Nearest_mipmap_nearest -> Gl.nearest_mipmap_nearest
+
+  let enum_of_mag_filter = function 
+  | `Linear -> Gl.nearest 
+  | `Nearest -> Gl.linear
+
+  let enum_of_wrap = function
+  | `Clamp_to_edge -> Gl.clamp_to_edge
+  | `Mirrored_repeat -> Gl.mirrored_repeat
+  | `Repeat -> Gl.repeat
+
+  let internal_format_enum_of_format = function 
+  | `RGBA_Float32 -> Gl.rgba32f
+  | `RGBA_Int8 -> Gl.rgba8i
+  | `RGBA_Int8_norm -> Gl.rgba8_snorm
+  | `RGBA_UInt8 -> Gl.rgba8ui
+  | `RGBA_UInt8_norm -> Gl.rgba8
+  | `RGB_Float32 -> Gl.rgb32f
+  | `RGB_Int8 -> Gl.rgb8i
+  | `RGB_Int8_norm -> Gl.rgb8_snorm
+  | `RGB_UInt8 -> Gl.rgb8ui
+  | `RGB_UInt8_norm -> Gl.rgb8
+  | `RG_Float32 -> Gl.rg32f
+  | `RG_Int8 -> Gl.rg8i
+  | `RG_Int8_norm -> Gl.rg8_snorm
+  | `RG_UInt8 -> Gl.rg8ui
+  | `RG_UInt8_norm -> Gl.rg8
+  | `R_Float32 -> Gl.r32f
+  | `R_Int8 -> Gl.r8i
+  | `R_Int8_norm -> Gl.r8_snorm
+  | `R_UInt8 -> Gl.r8ui
+  | `R_UInt8_norm -> Gl.r8
+  | `SRGBA_UInt8_norm -> Gl.srgb8_alpha8
+  | `SRGB_UInt8_norm -> Gl.srgb8
+  | `D_UInt16 -> Gl.depth_component16
+  | `D_UInt24 -> Gl.depth_component24
+  | `D_Float32 -> Gl.depth_component32f
+  | `D_UInt24_S_UInt8 -> Gl.depth24_stencil8 
+  | `D_Float32_S_UInt8 -> Gl.depth32f_stencil8
+  | `S_UInt8 -> Gl.stencil_index8
+
+  let format_enum_of_format = function 
+  | `R_Float32 | `R_Int8_norm | `R_UInt8_norm -> Gl.red
+  | `R_Int8 | `R_UInt8 -> Gl.red_integer
+  | `RG_Float32 | `RG_Int8_norm | `RG_UInt8_norm -> Gl.rg
+  | `RG_Int8 | `RG_UInt8 -> Gl.rg_integer
+  | `RGB_Float32 | `RGB_Int8_norm | `RGB_UInt8_norm | `SRGB_UInt8_norm -> Gl.rgb
+  | `RGB_Int8 | `RGB_UInt8 -> Gl.rgb_integer
+  | `RGBA_Float32 | `RGBA_Int8_norm | `RGBA_UInt8_norm | `SRGBA_UInt8_norm -> 
+      Gl.rgba
+  | `RGBA_Int8 | `RGBA_UInt8  -> Gl.rgba_integer
+  | `D_UInt16 | `D_UInt24 | `D_Float32 -> Gl.depth_component 
+  | `D_UInt24_S_UInt8 | `D_Float32_S_UInt8 -> Gl.depth_stencil
+  | `S_UInt8 -> Gl.stencil_index
+
+  let type_enum_of_format = function 
+  | `R_UInt8 | `R_UInt8_norm | `RG_UInt8 | `RG_UInt8_norm | `RGB_UInt8 
+  | `RGB_UInt8_norm | `RGBA_UInt8 | `RGBA_UInt8_norm | `SRGB_UInt8_norm 
+  | `SRGBA_UInt8_norm | `S_UInt8 -> 
+      Gl.unsigned_byte
+  | `D_UInt16 -> 
+      Gl.unsigned_short
+  | `R_Int8  | `R_Int8_norm | `RG_Int8 | `RG_Int8_norm | `RGB_Int8 
+  | `RGB_Int8_norm | `RGBA_Int8 | `RGBA_Int8_norm -> 
+      Gl.byte
+  | `R_Float32 | `RG_Float32 | `RGB_Float32 | `RGBA_Float32 | `D_Float32 ->
+      Gl.float
+  | `D_UInt24 | `D_UInt24_S_UInt8 | `D_Float32_S_UInt8 -> 
+     (* TODO, nothing ? *) 
+      Gl.byte
+
+  type info = { id : Id.t;  }
+  let inject, project = Info.create () 
+  let info p = project (info p) 
+  let get_info p = match info p with None -> assert false | Some i -> i 
+  let set_info p (i : info) = set_info p (inject i) 
+
+  let finalise_info i = 
+    Gl_hi.delete_texture i.id
+
+  let setup_info r t id = 
+    let i = { id } in 
+    Gc.finalise finalise_info i;
+    set_info t i; 
+    i
+
+  let setup r t = 
+    if t == Tex.nil then () else
+    let id = match info t with
+    | Some info -> info.id
+    | None -> 
+        let id = Gl_hi.gen_texture () in 
+        let info = setup_info r t id  in
+        info.id
+    in
+    if not (Tex.gpu_update t) then () else
+    let buf_id = match Tex.buf t with 
+    | None -> 0 
+    | Some b -> Buf.setup r b; (Buf.get_info b).Buf.id 
+    in
+    let kind = Tex.kind t in
+    let target = target_enum_of_kind kind in
+    let tex_format = Tex.format t in
+    let internal = internal_format_enum_of_format tex_format in 
+    let format = format_enum_of_format tex_format in 
+    let type_ = type_enum_of_format tex_format in
+    let size = Tex.size t in
+    let wrap_s = enum_of_wrap (Tex.wrap_s t) in 
+    let wrap_t = enum_of_wrap (Tex.wrap_t t) in 
+    let wrap_r = enum_of_wrap (Tex.wrap_r t) in 
+    let w = Float.int_of_round (Size3.w size) in 
+    let h = Float.int_of_round (Size3.h size) in 
+    let d = Float.int_of_round (Size3.d size) in
+    Gl.pixel_storei Gl.unpack_alignment 1; 
+    if buf_id <> 0 then Gl.bind_buffer Gl.pixel_unpack_buffer buf_id;
+    Gl.bind_texture target id;
+    begin match kind with
+    | `D1 -> 
+        Gl.tex_parameteri target Gl.texture_wrap_s wrap_s; 
+        Gl.tex_image1d target 0 internal w 0 format type_ (`Offset 0);
+    | `D2 -> 
+        Gl.tex_parameteri target Gl.texture_wrap_s wrap_s; 
+        Gl.tex_parameteri target Gl.texture_wrap_t wrap_t; 
+        Gl.tex_image2d target 0 internal w h 0 format type_ (`Offset 0);
+    | `D3 -> 
+        Gl.tex_parameteri target Gl.texture_wrap_s wrap_s; 
+        Gl.tex_parameteri target Gl.texture_wrap_t wrap_t; 
+        Gl.tex_parameteri target Gl.texture_wrap_r wrap_r; 
+        Gl.tex_image3d target 0 internal w h d 0 format type_ (`Offset 0);
+    | `Buffer -> 
+        Gl.tex_buffer target internal buf_id
+    end;
+    if kind <> `Buffer then begin
+      let mag = enum_of_mag_filter (Tex.mag_filter t) in 
+      let min = enum_of_min_filter (Tex.min_filter t) in
+      Gl.tex_parameteri target Gl.texture_mag_filter mag; 
+      Gl.tex_parameteri target Gl.texture_min_filter min;
+      if Tex.mipmaps t then Gl.generate_mipmap target;
+    end;
+    Gl.bind_texture target 0;
+    Gl.bind_buffer Gl.pixel_unpack_buffer 0; 
+    Tex.set_gpu_update t false;
+    if Tex.buf_autorelease t then Tex.set_buf t None;
+    ()
 end
 
 (* Programs *) 
@@ -644,9 +812,15 @@ module Prog = struct
       mc
   | _ -> raise Exit 
 
+  let tex = function 
+  | `Tex t -> t
+  | _ -> raise Exit
+
+
   let bind_uniforms r prog e op =
     let us = Effect.uniforms e in 
     let model_to_world = lazy (M4.mul op.tr (Prim.tr op.prim)) in
+    let next_active_tex = ref 0 in
     let bind_uniform name u = match Uniform.find_named us name with 
     | None -> log_error r (`Msg (str "uniform %s undefined" name))(*TODO*) 
     | Some v ->
@@ -681,15 +855,14 @@ module Prog = struct
             | `M3 -> Gl.uniform_matrix3fv u.u_loc 1 false (m3 v) 
             | `M4 -> Gl.uniform_matrix4fv u.u_loc 1 false (m4 v) 
             end
-        | `Sampler -> 
-            failwith "TODO"
-(*
-            let t = tex v in 
+        | `Sampler ->
+            let t = tex v in
+            let tid = Tex.setup r t; (Tex.get_info t).Tex.id in
+            let target = Tex.target_enum_of_kind (Tex.kind t) in
             Gl.active_texture (Gl.texture0 + !next_active_tex); 
-            Gl.bind_texture t.id;
+            Gl.bind_texture target tid;
             Gl.uniform1i u.u_loc !next_active_tex; 
             incr next_active_tex;
-*)
         | `Unsupported v -> 
             log_error r (`Msg (str "Unsupported uniform type: %d" v))
         with Exit -> 

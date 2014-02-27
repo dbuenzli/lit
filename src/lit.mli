@@ -471,9 +471,100 @@ type prog
 type effect 
 (** The type for effects. *) 
 
-(** Textures. *)
+(** Textures. 
+
+    {b TODO} We need to introduce Tex.sampler which will map to GL's
+    3.3 sampler objects. A tex uniform will then be a pair Tex.t *
+    Tex.sampler (mmh except for Buffer textures...).  The fallback
+    should simply set the parameters and we should say that in
+    renderers that don't support rendering a tex with different
+    Tex.sampler won't work. *)
 module Tex : sig
-  type t
+
+  (** {1 Textures} *) 
+
+  type wrap = [ `Repeat | `Mirrored_repeat | `Clamp_to_edge ]
+  (** The type for texture wraps *) 
+
+  type mag_filter = [ `Linear | `Nearest ]
+  (** The type for magnification filters. *)
+
+  type min_filter = 
+    [ `Linear | `Linear_mipmap_linear | `Linear_mipmap_nearest
+    | `Nearest | `Nearest_mipmap_linear | `Nearest_mipmap_nearest ]
+  (** The type for minification filters. *)
+
+  type kind = [ `D1 | `D2 | `D3 | `Buffer ]
+  (** The type for kinds of textures. TODO add `Cube_map *) 
+    
+  type format = 
+    [ `R_UInt8 | `R_Int8 | `R_UInt8_norm | `R_Int8_norm | `R_Float32
+    | `RG_UInt8 | `RG_Int8 | `RG_UInt8_norm | `RG_Int8_norm | `RG_Float32
+    | `RGB_UInt8 | `RGB_Int8 | `RGB_UInt8_norm | `RGB_Int8_norm | `RGB_Float32
+    | `RGBA_UInt8 | `RGBA_Int8 | `RGBA_UInt8_norm | `RGBA_Int8_norm 
+    | `RGBA_Float32
+    | `SRGB_UInt8_norm 
+    | `SRGBA_UInt8_norm 
+    | `D_UInt16 | `D_UInt24 | `D_Float32 
+    | `D_UInt24_S_UInt8 | `D_Float32_S_UInt8 
+    | `S_UInt8  ]
+  (** The type for texture formats. This defines both the internal 
+      texture format and the data given through {!init}. *) 
+
+  type init = [ 
+    | `D1 of float * Buf.t option
+    | `D2 of size2 * Buf.t option
+    | `D3 of size3 * Buf.t option
+    | `Buffer of Buf.t ]
+  (** The type for texture initialisation, determines the kind 
+      of the the texture. TODO hook Gg.Raster in. 
+
+      Buffers image data pixel by pixel in row order then 
+      layer order, the first pixel of the buffer is the image's 
+      lower left frontmost pixel. *) 
+               
+  type t = tex
+  (** The type for textures. *) 
+
+  val nil : tex
+  (** [nil] is a stub texture that can be used for example to initialize 
+      texture uniforms. Trying to render the nil texture results in an error. *)
+
+  val create : ?wrap_s:wrap -> ?wrap_t:wrap -> ?wrap_r:wrap -> 
+    ?mipmaps:bool ->  ?min_filter:min_filter -> ?mag_filter:mag_filter -> 
+    ?buf_autorelease:bool -> format:format -> init -> tex
+    (** {ul
+        {- [wrap_s, wrap_t, wrap_r], wrapping behaviour, if applicable, 
+           along [s], [t] and [r] dimensions. Defaults to `Repeat.}
+        {- [mipmaps], if [true] generates mipmaps. Defaults to [false].}
+        {- [min_filter], if applicable, minification filter. Defaults to 
+           [`Nearest_mipmap_linear].}
+        {- [mag_filter], if applicable, magnification filter. Defaults to 
+           [`Nearest].} 
+        {- [buf_autorelease], doesn't keep a reference on buf once
+           texture has been uploaded to gpu. Defaults to [true] for 
+           `D1 to `D3 but false on `Buffer.}
+        {- [format], the internal format.}} *) 
+
+  val format : tex -> format 
+  val kind : tex -> kind 
+  val size : tex -> size3 
+  val buf : tex -> Buf.t option
+  val set_buf : tex -> Buf.t option -> unit
+  val buf_autorelease : tex -> bool 
+  val set_buf_autorelease : tex -> bool -> unit
+  val gpu_update : tex -> bool 
+  val set_gpu_update : tex -> bool -> unit
+  (** Needs to be called if you change the underlying buffer and 
+      want buffer changes to be picked up. *)
+  val wrap_s : tex -> wrap 
+  val wrap_t : tex -> wrap 
+  val wrap_r : tex -> wrap 
+  val mipmaps : tex -> bool
+  val min_filter : tex -> min_filter 
+  val mag_filter : tex -> mag_filter 
+
+  val pp : Format.formatter -> tex -> unit
 end
 
 (** Uniforms. *) 
@@ -1051,6 +1142,12 @@ module Renderer : sig
       include module type of Prim
       val info : prim -> Info.t
       val set_info : prim -> Info.t -> unit
+    end
+
+    module Tex : sig 
+      include module type of Tex 
+      val info : tex -> Info.t 
+      val set_info : tex -> Info.t -> unit
     end
 
     module Prog : sig 

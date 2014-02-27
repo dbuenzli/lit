@@ -421,8 +421,104 @@ end
 (* Textures *) 
 
 module Tex = struct
-  type t
-  let pp ppf v = ()
+  type wrap = [ `Repeat | `Mirrored_repeat | `Clamp_to_edge ]
+  type mag_filter = [ `Linear | `Nearest ]
+  type min_filter = 
+    [ `Linear | `Linear_mipmap_linear | `Linear_mipmap_nearest
+    | `Nearest | `Nearest_mipmap_linear | `Nearest_mipmap_nearest ]
+
+  type kind = [ `D1 | `D2 | `D3 | `Buffer ]
+  type format = 
+    [ `R_UInt8 | `R_Int8 | `R_UInt8_norm | `R_Int8_norm | `R_Float32
+    | `RG_UInt8 | `RG_Int8 | `RG_UInt8_norm | `RG_Int8_norm | `RG_Float32
+    | `RGB_UInt8 | `RGB_Int8 | `RGB_UInt8_norm | `RGB_Int8_norm | `RGB_Float32
+    | `RGBA_UInt8 | `RGBA_Int8 | `RGBA_UInt8_norm | `RGBA_Int8_norm 
+    | `RGBA_Float32
+    | `SRGB_UInt8_norm 
+    | `SRGBA_UInt8_norm
+    | `D_UInt16 | `D_UInt24 | `D_Float32 
+    | `D_UInt24_S_UInt8 | `D_Float32_S_UInt8 
+    | `S_UInt8 ]
+
+  type init = [ 
+    | `D1 of float * Buf.t option
+    | `D2 of size2 * Buf.t option
+    | `D3 of size3 * Buf.t option
+    | `Buffer of Buf.t ]
+               
+  type t = 
+    { kind : kind; 
+      format : format; 
+      mutable size : size3;
+      mutable buf : Buf.t option;
+      mutable buf_autorelease : bool;
+      mutable gpu_update : bool; 
+      mutable wrap_s : wrap;
+      mutable wrap_t : wrap;
+      mutable wrap_r : wrap;
+      mutable mipmaps : bool; 
+      mutable min_filter : min_filter; 
+      mutable mag_filter : mag_filter; 
+      mutable info : Info.t; }
+    
+  let nil = 
+    { kind = `D1; 
+      format = `R_UInt8; 
+      size = Size3.zero;
+      buf = None; 
+      buf_autorelease = true; 
+      gpu_update = false;
+      wrap_s = `Repeat; 
+      wrap_t = `Repeat; 
+      wrap_r = `Repeat; 
+      mipmaps = false; 
+      min_filter = `Nearest_mipmap_linear; 
+      mag_filter = `Nearest;
+      info = Info.none; }
+
+  let create ?(wrap_s = `Repeat) ?(wrap_t = `Repeat) ?(wrap_r = `Repeat) 
+      ?(mipmaps = false) ?(min_filter = `Nearest_mipmap_linear) 
+      ?(mag_filter = `Nearest) ?buf_autorelease ~format init = 
+    (* TODO buffer length checks *) 
+    let kind, size, buf, default_buf_autorelease = match init with 
+    | `D1 (s, b) -> `D1, Size3.v s 1. 1., b, true 
+    | `D2 (s, b) -> `D2, Size3.v (Size2.w s) (Size2.h s) 1., b, true 
+    | `D3 (s, b) -> `D3, s, b, true
+    | `Buffer b -> `Buffer, Size3.zero, Some b, false
+    in
+    let buf_autorelease = match buf_autorelease with 
+    | None -> default_buf_autorelease
+    | Some b -> b
+    in
+    { kind; format; size; 
+      buf; buf_autorelease;
+      gpu_update = true;
+      wrap_s; wrap_t; wrap_r;
+      mipmaps; min_filter; mag_filter;
+      info = Info.none; }
+  
+  let format t = t.format
+  let kind t = t.kind
+  let size t = t.size
+  let buf t = t.buf
+  let set_buf t b = t.buf <- b
+  let buf_autorelease t = t.buf_autorelease 
+  let set_buf_autorelease t b = t.buf_autorelease <- b
+  let gpu_update t = t.gpu_update
+  let set_gpu_update t b = t.gpu_update <- b
+  let wrap_s t = t.wrap_s 
+  let wrap_t t = t.wrap_t
+  let wrap_r t = t.wrap_r
+  let mipmaps t = t.mipmaps
+  let min_filter t = t.min_filter
+  let mag_filter t = t.mag_filter 
+
+  let pp ppf t = pp ppf "tex pp is TODO" 
+
+  (* Renderer info *) 
+
+  let info b = b.info 
+  let set_info b i = b.info <- i
 end
 
 (* Uniforms *) 
@@ -1119,6 +1215,7 @@ module Renderer = struct
     module Buf = Buf
     module Attr = Attr
     module Prim = Prim
+    module Tex = Tex
     module Prog = Prog
     module Effect = Effect
     module Log = Log

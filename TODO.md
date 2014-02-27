@@ -6,8 +6,12 @@
 * Review the Uniform module, it's not that good I think. 
 * Interface mostly untyped. Explore the possibility of using 
   row polymorphism to match geometry against effects
-* Support for different shaders according to backend in effect
+* Support for different shaders according to backend in effect. 
+  Maybe not, leave that to the client and module system. 
 * Support for base vertex rendering. Prim.
+* Support for explicit resource allocate/disposal in the 
+  Renderer.{Buf,Prog,Tex} modules. For now it's allocate on usage and 
+  and dispose in Gc.finalizer.
 * Multipass (or not) 
 * Transform feedback 
 * Renderer.Caps.
@@ -15,6 +19,8 @@
 * Renderer.Buf.{blit,get}
 * Source-level meta programming, embbed a small shading language in
   OCaml.
-
+* Buf.gpu_upload -> gpu_update ? Make it consistent with Tex.
+  Also do we want to allow setting the value to false ?
 * Renderer.Uniform.builtin : Uniform.builtin -> value_untyped 
   (* For debugging *) 
+* Review pretty printers. 
