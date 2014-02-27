@@ -61,18 +61,19 @@ module Ba = struct
   let create k count = Bigarray.Array1.create k Bigarray.c_layout count 
   let length b = Bigarray.Array1.dim b
 
-  let pp ?count ?(stride = 0) ?(first = 0) ?(dim = 1) ~pp_scalar ppf ba = 
+  let pp ?count ?stride ?(first = 0) ?(dim = 1) ~pp_scalar ppf ba = 
     (* TODO invalid args *) 
+    let stride = match stride with None -> dim | Some stride -> stride in
     let count = match count with 
     | Some count -> count 
-    | None -> ((length ba + stride) - first) / (dim + stride) 
+    | None -> (length ba + (stride - dim) - first) / stride 
     in
     let i = ref first in
     let pp_group ppf () = 
       pp ppf "@[(%a" pp_scalar ba.{!i}; 
       for c = 1 to dim - 1 do pp ppf "@ %a" pp_scalar ba.{!i + c} done;
       pp ppf ")@]";
-      i := !i + dim + stride 
+      i := !i + stride
     in
     pp ppf "@[<hov>%a" pp_group ();
     for k = 1 to count - 1 do pp ppf "@ %a" pp_group (); done;
@@ -301,7 +302,8 @@ module Attr = struct
       first : int; 
       normalize : bool; }
 
-  let create ?(normalize = false) ?(stride = 0) ?(first = 0) name ~dim buf = 
+  let create ?(normalize = false) ?stride ?(first = 0) name ~dim buf = 
+    let stride = match stride with None -> dim | Some stride -> stride in
     if dim < 1 || dim > 4 then invalid_arg (err_attr_dim dim) else
     { name; dim; buf; stride; first; normalize; }
                                                                  

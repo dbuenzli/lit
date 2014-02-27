@@ -6,5 +6,7 @@ test/models
 *~
 \.\#*
 \#*#
+*.native
+*.byte
 .DS_Store
 CLOCK.org

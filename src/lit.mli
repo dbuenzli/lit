@@ -40,9 +40,10 @@ module Ba : sig
     Format.formatter -> ('a, 'b) bigarray -> unit
   (** [pp limit stride first dim pp_scalar ppf b] prints on [ppf], 
       [count] groups of size [dim] of scalars of [b], starting at [first]
-      using [pp_scalar], and skipping [stride] scalars between two groups.
-      If [limit] is unspecified prints as much as possible [stride] and [first]
-      defaults to [0] and [dim] to [1]. *)
+      using [pp_scalar], and striding [stride] scalars to go from group
+      to grup. If [limit] is unspecified prints as much as 
+      possible. [stride] defaults to [dim], [first] defaults to [0] and 
+      [dim] to [1]. *)
 
   (** {1:get Getting} 
 
@@ -299,8 +300,8 @@ module Attr : sig
          signed integer are respectively mapped to floating point 
          ranges [\[0;1\]] and [\[-1;1\]] on access on the GPU;
          defaults to [false].} 
-      {- [stride] is the number of {e scalars} to skip in [buf] 
-         between two consecutive attribute elements; defaults to [0].}
+      {- [stride] is the number of {e scalars} from attribute 
+         element to attribute element, defaults to [dim].}
       {- [first] is the {e scalar} index of the first attribute 
          element in [buf]; defaults to 0.}
       {- [name] is the name of the attribute. This name will be used

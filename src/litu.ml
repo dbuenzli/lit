@@ -204,11 +204,11 @@ module Prim = struct
         done
       done;
       let b = Buf.create (`Bigarray b) in      
-      let stride = if do_tex then 2 else 0 in
+      let stride = if do_tex then 5 else 3 in
       (Attr.create ~stride ~first:0 Attr.vertex ~dim:3 b) :: 
       match tex with 
       | None -> []
-      | Some tex -> [ Attr.create ~stride:3 ~first:3 tex ~dim:2 b ]
+      | Some tex -> [ Attr.create ~stride:5 ~first:3 tex ~dim:2 b ]
     in
     let index = 
       let b = Ba.create Bigarray.int8_unsigned (xseg * yseg * 2 * 3) in 
@@ -261,15 +261,14 @@ module Prim = struct
     ns:(float, 'd) bigarray -> unit = 
     fun ~tri_count ~index ~vs ~vs_first ~vs_stride ~ns ->
     let count = Bigarray.Array1.dim ns in
-    let vs_width = 3 + vs_stride in
     for i = 0 to count - 1 do ns.{i} <- 0. done;
     for i = 0 to tri_count - 1 do
       let vi1 = index () in 
       let vi2 = index () in 
       let vi3 = index () in 
-      let v1 = Ba.get_v3 vs (vs_first + vi1 * vs_width) in 
-      let v2 = Ba.get_v3 vs (vs_first + vi2 * vs_width) in 
-      let v3 = Ba.get_v3 vs (vs_first + vi3 * vs_width) in
+      let v1 = Ba.get_v3 vs (vs_first + vi1 * vs_stride) in 
+      let v2 = Ba.get_v3 vs (vs_first + vi2 * vs_stride) in 
+      let v3 = Ba.get_v3 vs (vs_first + vi3 * vs_stride) in
       let n = V3.(cross (v2 - v1) (v3 - v1)) in
       ignore (Ba.set_v3 ns (vi1 * 3) (V3.add n (Ba.get_v3 ns (vi1 * 3)))); 
       ignore (Ba.set_v3 ns (vi2 * 3) (V3.add n (Ba.get_v3 ns (vi2 * 3)))); 
@@ -298,7 +297,9 @@ module Prim = struct
       let do_it vs_ba_kind ns_ba_kind = match Buf.cpu vs vs_ba_kind with 
       | None -> invalid_arg (err_no_cpu_buf "vertex attribute")
       | Some vs -> 
-          let count = (Bigarray.Array1.dim vs - vs_first) / (3 + vs_stride) in 
+          let count = 
+            (Ba.length vs + (vs_stride - dim) - vs_first) / vs_stride
+          in
           let ns = Ba.create ns_ba_kind (3 * count) in 
           do_normals ~index ~tri_count ~vs ~vs_first ~vs_stride ~ns; 
           Attr.create Attr.normal ~dim:3 (Buf.create (`Bigarray ns))
