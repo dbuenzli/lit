@@ -329,8 +329,8 @@ module Tex = struct
   | `Nearest_mipmap_nearest -> Gl.nearest_mipmap_nearest
 
   let enum_of_mag_filter = function 
-  | `Linear -> Gl.nearest 
-  | `Nearest -> Gl.linear
+  | `Linear -> Gl.linear
+  | `Nearest -> Gl.nearest
 
   let enum_of_wrap = function
   | `Clamp_to_edge -> Gl.clamp_to_edge
