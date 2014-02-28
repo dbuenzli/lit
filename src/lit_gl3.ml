@@ -857,6 +857,9 @@ module Prog = struct
             end
         | `Sampler ->
             let t = tex v in
+            if t == Tex.nil then 
+              log_error r (`Msg (str "%s uniform value is nil texture" name))
+            else
             let tid = Tex.setup r t; (Tex.get_info t).Tex.id in
             let target = Tex.target_enum_of_kind (Tex.kind t) in
             Gl.active_texture (Gl.texture0 + !next_active_tex); 
