@@ -451,10 +451,15 @@ module Tex = struct
 
   type kind = [ `D1 | `D2 | `D3 | `Buffer ]
   type format = 
-    [ `R_UInt8 | `R_Int8 | `R_UInt8_norm | `R_Int8_norm | `R_Float32
-    | `RG_UInt8 | `RG_Int8 | `RG_UInt8_norm | `RG_Int8_norm | `RG_Float32
-    | `RGB_UInt8 | `RGB_Int8 | `RGB_UInt8_norm | `RGB_Int8_norm | `RGB_Float32
+    [ `R_UInt8 | `R_Int8 | `R_UInt8_norm | `R_Int8_norm 
+    | `R_UInt16 | `R_Int16 | `R_UInt16_norm | `R_Int16_norm | `R_Float32
+    | `RG_UInt8 | `RG_Int8 | `RG_UInt8_norm | `RG_Int8_norm 
+    | `RG_UInt16 | `RG_Int16 | `RG_UInt16_norm | `RG_Int16_norm |`RG_Float32
+    | `RGB_UInt8 | `RGB_Int8 | `RGB_UInt8_norm | `RGB_Int8_norm 
+    | `RGB_UInt16 | `RGB_Int16 | `RGB_UInt16_norm | `RGB_Int16_norm  
+    | `RGB_Float32
     | `RGBA_UInt8 | `RGBA_Int8 | `RGBA_UInt8_norm | `RGBA_Int8_norm 
+    | `RGBA_UInt16 | `RGBA_Int16 | `RGBA_UInt16_norm | `RGBA_Int16_norm 
     | `RGBA_Float32
     | `SRGB_UInt8_norm 
     | `SRGBA_UInt8_norm

@@ -337,23 +337,39 @@ module Tex = struct
   | `Mirrored_repeat -> Gl.mirrored_repeat
   | `Repeat -> Gl.repeat
 
-  let internal_format_enum_of_format = function 
+  let internal_format_enum_of_format : Lit.Tex.format -> Gl.enum = function 
   | `RGBA_Float32 -> Gl.rgba32f
+  | `RGBA_Int16 -> Gl.rgba16i
+  | `RGBA_Int16_norm -> Gl.rgba16_snorm
+  | `RGBA_UInt16 -> Gl.rgba16ui
+  | `RGBA_UInt16_norm -> Gl.rgba16
   | `RGBA_Int8 -> Gl.rgba8i
   | `RGBA_Int8_norm -> Gl.rgba8_snorm
   | `RGBA_UInt8 -> Gl.rgba8ui
   | `RGBA_UInt8_norm -> Gl.rgba8
   | `RGB_Float32 -> Gl.rgb32f
+  | `RGB_Int16 -> Gl.rgb16i
+  | `RGB_Int16_norm -> Gl.rgb16_snorm
+  | `RGB_UInt16 -> Gl.rgb16ui
+  | `RGB_UInt16_norm -> Gl.rgb16
   | `RGB_Int8 -> Gl.rgb8i
   | `RGB_Int8_norm -> Gl.rgb8_snorm
   | `RGB_UInt8 -> Gl.rgb8ui
   | `RGB_UInt8_norm -> Gl.rgb8
   | `RG_Float32 -> Gl.rg32f
+  | `RG_Int16 -> Gl.rg16i
+  | `RG_Int16_norm -> Gl.rg16_snorm
+  | `RG_UInt16 -> Gl.rg16ui
+  | `RG_UInt16_norm -> Gl.rg16
   | `RG_Int8 -> Gl.rg8i
   | `RG_Int8_norm -> Gl.rg8_snorm
   | `RG_UInt8 -> Gl.rg8ui
   | `RG_UInt8_norm -> Gl.rg8
   | `R_Float32 -> Gl.r32f
+  | `R_Int16 -> Gl.r16i
+  | `R_Int16_norm -> Gl.r16_snorm
+  | `R_UInt16 -> Gl.r16ui
+  | `R_UInt16_norm -> Gl.r16
   | `R_Int8 -> Gl.r8i
   | `R_Int8_norm -> Gl.r8_snorm
   | `R_UInt8 -> Gl.r8ui
@@ -367,30 +383,39 @@ module Tex = struct
   | `D_Float32_S_UInt8 -> Gl.depth32f_stencil8
   | `S_UInt8 -> Gl.stencil_index8
 
-  let format_enum_of_format = function 
-  | `R_Float32 | `R_Int8_norm | `R_UInt8_norm -> Gl.red
-  | `R_Int8 | `R_UInt8 -> Gl.red_integer
-  | `RG_Float32 | `RG_Int8_norm | `RG_UInt8_norm -> Gl.rg
-  | `RG_Int8 | `RG_UInt8 -> Gl.rg_integer
-  | `RGB_Float32 | `RGB_Int8_norm | `RGB_UInt8_norm | `SRGB_UInt8_norm -> Gl.rgb
-  | `RGB_Int8 | `RGB_UInt8 -> Gl.rgb_integer
-  | `RGBA_Float32 | `RGBA_Int8_norm | `RGBA_UInt8_norm | `SRGBA_UInt8_norm -> 
+  let format_enum_of_format : Lit.Tex.format -> Gl.enum = function 
+  | `R_Float32 | `R_Int8_norm | `R_UInt8_norm 
+  | `R_Int16_norm | `R_UInt16_norm -> Gl.red
+  | `R_Int8 | `R_UInt8 | `R_Int16 | `R_UInt16 -> Gl.red_integer
+  | `RG_Float32 | `RG_Int8_norm | `RG_UInt8_norm 
+  | `RG_Int16_norm | `RG_UInt16_norm -> Gl.rg
+  | `RG_Int8 | `RG_UInt8 | `RG_Int16 | `RG_UInt16 -> Gl.rg_integer
+  | `RGB_Float32 | `RGB_Int8_norm | `RGB_UInt8_norm 
+  | `RGB_Int16_norm | `RGB_UInt16_norm 
+  | `SRGB_UInt8_norm -> Gl.rgb
+  | `RGB_Int8 | `RGB_UInt8 | `RGB_Int16 | `RGB_UInt16 -> Gl.rgb_integer
+  | `RGBA_Float32 | `RGBA_Int8_norm | `RGBA_UInt8_norm 
+  | `RGBA_Int16_norm | `RGBA_UInt16_norm | `SRGBA_UInt8_norm ->
       Gl.rgba
-  | `RGBA_Int8 | `RGBA_UInt8  -> Gl.rgba_integer
+  | `RGBA_Int8 | `RGBA_UInt8 | `RGBA_Int16 | `RGBA_UInt16  -> Gl.rgba_integer
   | `D_UInt16 | `D_UInt24 | `D_Float32 -> Gl.depth_component 
   | `D_UInt24_S_UInt8 | `D_Float32_S_UInt8 -> Gl.depth_stencil
   | `S_UInt8 -> Gl.stencil_index
 
-  let type_enum_of_format = function 
+  let type_enum_of_format : Tex.format -> Gl.enum = function 
   | `R_UInt8 | `R_UInt8_norm | `RG_UInt8 | `RG_UInt8_norm | `RGB_UInt8 
   | `RGB_UInt8_norm | `RGBA_UInt8 | `RGBA_UInt8_norm | `SRGB_UInt8_norm 
   | `SRGBA_UInt8_norm | `S_UInt8 -> 
       Gl.unsigned_byte
-  | `D_UInt16 -> 
-      Gl.unsigned_short
   | `R_Int8  | `R_Int8_norm | `RG_Int8 | `RG_Int8_norm | `RGB_Int8 
   | `RGB_Int8_norm | `RGBA_Int8 | `RGBA_Int8_norm -> 
       Gl.byte
+  | `R_UInt16 | `R_UInt16_norm | `RG_UInt16 | `RG_UInt16_norm | `RGB_UInt16 
+  | `RGB_UInt16_norm | `RGBA_UInt16 | `RGBA_UInt16_norm | `D_UInt16 -> 
+      Gl.unsigned_short
+  | `R_Int16 | `R_Int16_norm | `RG_Int16 | `RG_Int16_norm | `RGB_Int16 
+  | `RGB_Int16_norm | `RGBA_Int16 | `RGBA_Int16_norm -> 
+      Gl.short
   | `R_Float32 | `RG_Float32 | `RGB_Float32 | `RGBA_Float32 | `D_Float32 ->
       Gl.float
   | `D_UInt24 | `D_UInt24_S_UInt8 | `D_Float32_S_UInt8 -> 
