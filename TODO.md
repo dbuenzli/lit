@@ -1,6 +1,9 @@
 * `Uniform.viewport_{o,size}` should we still have them in 
   normalized surface coordinate and have a seperate `surface_size`
   builtin ? 
+* Use Lequal as default depth test.
+* s/shader_kind/shader_stage
+* Add depth_range to View.
 * View is not what we want yet I think. I should be easy to change 
   the aspect e.g. maybe specify the projection through a variant.
 * Review the Uniform module, it's not that good I think. 
@@ -24,3 +27,4 @@
 * Renderer.Uniform.builtin : Uniform.builtin -> value_untyped 
   (* For debugging *) 
 * Review pretty printers. 
+* glEnable (GL_MULTISAMPLE_ARB)

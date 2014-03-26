@@ -350,7 +350,6 @@ let create config =
       app
   | _ -> app
 
-
 let update_surface app = match app.init with 
 | `Ok (win, _) -> Sdl.gl_swap_window win
 | _ -> ()

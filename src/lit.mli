@@ -829,6 +829,9 @@ type view
 
 (** Views. 
 
+    A view defines a view volume in 3D space mapped to clipped 
+    space.
+
     A view defines the rendered view volume in 3D space and the
     viewport on which rendering occurs on the renderer's surface.
 

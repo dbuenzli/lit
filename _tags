@@ -1,4 +1,4 @@
-<**/*.{mli,ml}> : bin_annot, annot, debug
+<**/*.{mli,ml}> : bin_annot, annot, debug, thread
 <tsdl> : include
 <src> : include
 <test> : include
