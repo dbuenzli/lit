@@ -29,53 +29,103 @@ module Prim = struct
     let i = ref 0 in 
     fun x y z -> set b !i x y z; i := !i + 3
 
-  let cuboid_dups ?name extents = 
-    let x, y, z = V3.(to_tuple (0.5 * extents)) in
+  let rect ?name ?tex ?(segs = Size2.unit) spec =
+    let do_tex = tex <> None in
+    let xseg = Float.int_of_round (Size2.w segs) in
+    let yseg = Float.int_of_round (Size2.h segs) in
     let attrs = 
-      let b = Ba.create Bigarray.float32 (8 * 3 * 3) in 
-      let push = pusher Ba.set_3d b in 
-      push (-.x) (-.y) (  z); push (  x) (-.y) (  z); (* Front *)
-      push (  x) (  y) (  z); push (-.x) (  y) (  z);
-      push (-.x) (-.y) (  z); push (  x) (-.y) (  z); (* Bottom *)
-      push (  x) (-.y) (-.z); push (-.x) (-.y) (-.z);
-      push (-.x) (-.y) (  z); push (-.x) (-.y) (-.z); (* Left *)
-      push (-.x) (  y) (-.z); push (-.x) (  y) (  z);
-      push (  x) (-.y) (  z); push (  x) (-.y) (-.z); (* Right *)
-      push (  x) (  y) (-.z); push (  x) (  y) (  z);
-      push (  x) (  y) (  z); push (  x) (  y) (-.z); (* Top *)
-      push (-.x) (  y) (-.z); push (-.x) (  y) (  z);
-      push (-.x) (  y) (-.z); push (-.x) (-.y) (-.z); (* Rear *)
-      push (  x) (-.y) (-.z); push (  x) (  y) (-.z);
-      [ Attr.create Attr.vertex ~dim:3 (Buf.create (`Bigarray b)) ]
+      let xsegf = float xseg in 
+      let ysegf = float yseg in 
+      let dx, dy, x0, y0 = match spec with 
+      | `Size s -> 
+          let dx = Size2.w s /. xsegf in 
+          let dy = Size2.h s /. ysegf in 
+          let x0 = -0.5 *. Size2.w s in 
+          let y0 = -0.5 *. Size2.h s in
+          dx, dy, x0, y0
+      | `Box b -> 
+          let dx = Size2.w (Box2.size b) /. xsegf in 
+          let dy = Size2.h (Box2.size b) /. ysegf in
+          let x0 = Box2.minx b in 
+          let y0 = Box2.miny b in 
+          dx, dy, x0, y0
+      in
+      let vertex_count = (xseg + 1) * (yseg + 1) in
+      let tex_size = if do_tex then 2 * vertex_count else 0 in
+      let b = Ba.create Bigarray.float32 (3 * vertex_count + tex_size) in
+      let i = ref 0 in
+      for y = 0 to yseg do 
+        for x = 0 to xseg do 
+          let y = float y in 
+          let x = float x in
+          Ba.set_3d b !i (x0 +. x *. dx) (y0 +. y *. dy) 0.; i := !i + 3;
+          if do_tex then (Ba.set_2d b !i (x /. xsegf) (y /. ysegf); i := !i + 2)
+        done
+      done;
+      let b = Buf.create (`Bigarray b) in
+      let stride = if do_tex then 5 else 3 in
+      (Attr.create ~stride ~first:0 Attr.vertex ~dim:3 b) :: 
+      match tex with 
+      | None -> []
+      | Some tex -> [ Attr.create ~stride:5 ~first:3 tex ~dim:2 b ]
+    in
+    let index = 
+      let b = Ba.create Bigarray.int8_unsigned (xseg * yseg * 2 * 3) in 
+      let id x y = y * (xseg + 1) + x in 
+      let push = pusher Ba.set_3d b in
+      for y = 0 to yseg - 1 do 
+        for x = 0 to xseg - 1 do 
+          push (id x y) (id (x+1) (y  )) (id (x+1) (y+1));
+          push (id x y) (id (x+1) (y+1)) (id (x  ) (y+1))
+        done
+      done;
+      Buf.create (`Bigarray b)
+    in
+    Prim.create ?name ~index `Triangles attrs 
+
+  let cuboid_extrema = function
+  | `Size s -> 
+      let hw, hh, hd = V3.(to_tuple (0.5 * s)) in
+      (-.hw, -.hh, hd), (hw, hh, -.hd)
+  | `Box b -> 
+      if Box3.is_empty b then (0., 0., 0.), (0., 0., 0.) else
+      V3.to_tuple (Box3.min b), V3.to_tuple (Box3.max b)
+
+  let cuboid_dups ?name spec = 
+    let attrs =
+      let ba = Ba.create Bigarray.float32 (8 * 3 * 3) in 
+      let push = pusher Ba.set_3d ba in 
+      let (l, b, n), (r, t, f) = cuboid_extrema spec in
+      push l b n; push r b n; push r t n; push l t n; (* Near *)
+      push l b n; push r b n; push r b f; push l b f; (* Bottom *)
+      push l b n; push l b f; push l t f; push l t n; (* Left *)
+      push r b n; push r b f; push r t f; push r t n; (* Right *)
+      push r t n; push r t f; push l t f; push l t n; (* Top *)
+      push l t f; push l b f; push r b f; push r t f; (* Far *)
+      [ Attr.create Attr.vertex ~dim:3 (Buf.create (`Bigarray ba)) ]
     in
     let index = 
       let b = Ba.create Bigarray.int8_unsigned (6 * 2 * 3) in
       let push = pusher Ba.set_3d b in
-      push  0  2  3; push  0  1  2; (* Front *)
+      push  0  2  3; push  0  1  2; (* Near *)
       push  4  7  6; push  4  6  5; (* Bottom *)
       push  8 11 10; push  8 10  9; (* Left *)
       push 12 14 15; push 12 13 14; (* Right *) 
       push 16 17 18; push 16 18 19; (* Top *)
-      push 20 23 22; push 20 22 21; (* Rear *)
+      push 20 23 22; push 20 22 21; (* Far *)
       
       Buf.create (`Bigarray b)
     in
     Prim.create ?name ~index `Triangles attrs 
 
-  let cuboid_no_dups ?name extents = 
-    let x, y, z = V3.(to_tuple (0.5 * extents)) in
+  let cuboid_no_dups ?name spec = 
     let attrs = 
-      let b = Ba.create Bigarray.float32 (3 * 8) in 
-      let push = pusher Ba.set_3d b in
-      push (-.x) (-.y) (  z); (* left, bottom, front *)
-      push (  x) (-.y) (  z); (* right, bottom, front *)
-      push (-.x) (  y) (  z); (* left, top, front *)
-      push (  x) (  y) (  z); (* right, top, front *)
-      push (-.x) (-.y) (-.z); (* left, bottom, rear *)
-      push (  x) (-.y) (-.z); (* right, bottom, rear *)
-      push (-.x) (  y) (-.z); (* left, top, rear *)
-      push (  x) (  y) (-.z); (* right, top, rear *)
-      [ Attr.create Attr.vertex ~dim:3 (Buf.create (`Bigarray b)) ]
+      let ba = Ba.create Bigarray.float32 (3 * 8) in 
+      let push = pusher Ba.set_3d ba in
+      let (l, b, n), (r, t, f) = cuboid_extrema spec in
+      push l b n; push r b n; push l t n; push r t n; (* Near *)
+      push l b f; push r b f; push l t f; push r t f; (* Far *) 
+      [ Attr.create Attr.vertex ~dim:3 (Buf.create (`Bigarray ba)) ]
     in
     let index = 
       let b = Ba.create Bigarray.int8_unsigned (6 * 2 * 3) in
@@ -85,16 +135,15 @@ module Prim = struct
       push 0 6 4; push 0 2 6; (* Left *)
       push 1 7 3; push 1 5 7; (* Right *)
       push 2 7 6; push 2 3 7; (* Top *) 
-      push 4 7 5; push 4 6 7; (* Rear *)
+      push 4 7 5; push 4 6 7; (* Far *)
       Buf.create (`Bigarray b)
     in
     Prim.create ?name ~index `Triangles attrs 
 
-  let cuboid ?name ?(dups = true) extents =
-    if dups then cuboid_dups ?name extents else 
-    cuboid_no_dups ?name extents 
+  let cuboid ?name ?(dups = true) spec =
+    if dups then cuboid_dups ?name spec else cuboid_no_dups ?name spec
 
-  let cube ?name ?dups s = cuboid ?name ?dups (Size3.v s s s)
+  let cube ?name ?dups s = cuboid ?name ?dups (`Size (Size3.v s s s))
 
   (* Sphere *) 
 
@@ -168,50 +217,6 @@ module Prim = struct
     let index = Buf.create ~unsigned:true (`Bigarray is) in
     Prim.create ?name ~index `Triangles attrs
     
-  let rect ?name ?tex ?(segs = Size2.unit) size =
-    let do_tex = tex <> None in
-    let xseg = Float.int_of_round (Size2.w segs) in
-    let yseg = Float.int_of_round (Size2.h segs) in
-    let attrs = 
-      let xsegf = float xseg in 
-      let ysegf = float yseg in 
-      let dx = Size2.w size /. xsegf in 
-      let dy = Size2.h size /. ysegf in 
-      let x0 = -0.5 *. Size2.w size in 
-      let y0 = -0.5 *. Size2.h size in
-      let vertex_count = (xseg + 1) * (yseg + 1) in
-      let tex_size = if do_tex then 2 * vertex_count else 0 in
-      let b = Ba.create Bigarray.float32 (3 * vertex_count + tex_size) in
-      let i = ref 0 in
-      for y = 0 to yseg do 
-        for x = 0 to xseg do 
-          let y = float y in 
-          let x = float x in
-          Ba.set_3d b !i (x0 +. x *. dx) (y0 +. y *. dy) 0.; i := !i + 3;
-          if do_tex then (Ba.set_2d b !i (x /. xsegf) (y /. ysegf); i := !i + 2)
-        done
-      done;
-      let b = Buf.create (`Bigarray b) in      
-      let stride = if do_tex then 5 else 3 in
-      (Attr.create ~stride ~first:0 Attr.vertex ~dim:3 b) :: 
-      match tex with 
-      | None -> []
-      | Some tex -> [ Attr.create ~stride:5 ~first:3 tex ~dim:2 b ]
-    in
-    let index = 
-      let b = Ba.create Bigarray.int8_unsigned (xseg * yseg * 2 * 3) in 
-      let id x y = y * (xseg + 1) + x in 
-      let push = pusher Ba.set_3d b in
-      for y = 0 to yseg - 1 do 
-        for x = 0 to xseg - 1 do 
-          push (id x y) (id (x+1) (y  )) (id (x+1) (y+1));
-          push (id x y) (id (x+1) (y+1)) (id (x  ) (y+1))
-        done
-      done;
-      Buf.create (`Bigarray b)
-    in
-    Prim.create ?name ~index `Triangles attrs 
-
   (* Functions *) 
   
   let vertex_index_iterator count idx = 

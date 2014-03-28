@@ -18,21 +18,45 @@ open Lit
 (** Higher level primitives. 
 
     All these primitives define at least a {!Lit.Attr.vertex} attribute. 
-    Buffers are created with {!Buf.create}'s default arguments. *)  
+    Buffers are created with {!Lit.Buf.create}'s default arguments. *)  
 module Prim : sig
 
   (** {1 Primitives} 
 
       {b Note.} All these primitives are [`Triangles] primitives. *)
+
+  val rect : ?name:string -> ?tex:string -> ?segs:Size2.t ->
+    [ `Size of Size2.t | `Box of box2 ] -> prim
+  (** [rect ?name ?tex segs spec] is an axis-aligned Oxy 2D plane 
+      specified according to [spec]:
+      {ul 
+      {- [`Size s], the plane has extents [s] and is centered
+         on the origin.}
+      {- [`Box b], the plane is bounded by [b].}}
+
+      The plane is divided in [Size2.w segs] segments along the x-axis
+      and [Size2.h segs] along the y-axis ([segs] defaults to
+      {!Size2.unit}, its number are rounded to integers). Each segment
+      is made of two triangles.
+
+      If [tex] is specified, 2D texture coordinates are added to 
+      the primitive under that attribute name. The bottom left corner
+      of the plane is (0,0) and top right (1,1). *)
  
-  val cuboid : ?name:string -> ?dups:bool -> Gg.size3 -> prim
-  (** [cuboid dups extents] is a cuboid centered on the origin with
-      extents [extents]. If [dups] is [true] (default) vertices in the
-      mesh are triplicated so that per vertex normal computation defines 
-      planar facets. *)
+  val cuboid : ?name:string -> ?dups:bool -> 
+    [ `Size of Gg.size3 | `Box of box3 ] -> prim
+  (** [cuboid dups spec] is an axis-aligned cuboid specified according to
+      [spec]:
+      {ul 
+      {- [`Size s], the cuboid has extents [s] and is centered
+         on the origin.}
+      {- [`Box b], the cuboid is bounded by [b].}}
+      If [dups] is [true] (default) vertices in the mesh are
+      triplicated so that per vertex normal computation defines planar
+      facets. *)
 
   val cube : ?name:string -> ?dups:bool -> float -> prim
-  (** [cube name dups s] is [cube name dups (Size3.v s s s)]. *)
+  (** [cube name dups s] is [cube name dups (`Size (Size3.v s s s))]. *)
 
   val sphere : ?name:string -> ?level:int -> float -> prim
   (** [sphere level r] is a sphere of radius [r] centered 
@@ -40,19 +64,6 @@ module Prim : sig
       [level] defaults to [4]. The number of vertices is 4{^level + 1} + 2 and
       the number of triangles is 8 * 4{^ level}. If the number of vertices
       is greater than 2{^ 31} all sorts of bad things may happen... *) 
-
-  val rect : ?name:string -> ?tex:string -> ?segs:Size2.t -> Size2.t -> prim
-  (** [rect ?name ?tex segs size] is an Oxy plane of width [Size2.w
-      size] and height [Size2.h size] centered on the origin.  
-
-      The plane is divided in [Size2.w segs] segments along the x-axis
-      and [Size2.h] along the y-axis ([segs] defaults to
-      {!Size2.unit}, its number is rounded to integers). Each segment
-      is made of two triangles.
-
-      If [tex] is specified, 2D texture coordinates are added to 
-      the primitive under that attribute name. Bottom left is
-      (0,0), top right (1,1). *)
 
   (** {1 Functions} *) 
 
