@@ -472,7 +472,8 @@ module Tex : sig
 
   val format : tex -> format 
   val kind : tex -> kind 
-  val size : tex -> size3 
+  val size2 : tex -> size2 
+  val size3 : tex -> size3 
   val buf : tex -> Buf.t option
   val set_buf : tex -> Buf.t option -> unit
   val buf_autorelease : tex -> bool 

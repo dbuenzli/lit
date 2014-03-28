@@ -461,7 +461,8 @@ module Tex = struct
   
   let format t = t.format
   let kind t = t.kind
-  let size t = t.size
+  let size2 t = V2.of_v3 t.size
+  let size3 t = t.size
   let buf t = t.buf
   let set_buf t b = t.buf <- b
   let buf_autorelease t = t.buf_autorelease 
