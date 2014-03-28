@@ -18,7 +18,7 @@ let checkboard_tex () =
         let xm = if x land 8 = 0 then 1 else 0 in 
         let ym = if y land 8 = 0 then 1 else 0 in 
         let l = (xm lxor ym) * 225 in
-        i := Ba.set_3d img !i l l l;
+        Ba.set_3d img !i l l l; i := !i + 3
       done
     done; 
     Buf.create (`Bigarray img)
@@ -57,7 +57,7 @@ let effect = Effect.create program
 
 (* World *) 
 
-let prim = Litu.Prim.rect ~tex:"tex" (Size2.v 1. 1.)
+let prim = Litu.Prim.rect ~tex:"tex" (`Size (Size2.v 1. 1.))
 let prim_tr =
   let z = -0.1 *. Float.pi in 
   let y = -0.05 *. Float.pi in

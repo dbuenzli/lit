@@ -14,17 +14,17 @@ open Lit
 let fullscreen () = (* two triangles covering the projection of clip space *) 
   let attrs =                                    
     let b = Ba.create Bigarray.float32 (4 * 3) in 
-    let i = Ba.set_3d b 0 ( 1.) ( 1.) ( 0.) in                 (* vertices *) 
-    let i = Ba.set_3d b i (-1.) ( 1.) ( 0.) in
-    let i = Ba.set_3d b i ( 1.) (-1.) ( 0.) in
-    let _ = Ba.set_3d b i (-1.) (-1.) ( 0.) in
+    Ba.set_3d b 0 ( 1.) ( 1.) ( 0.);                 (* vertices *)
+    Ba.set_3d b 3 (-1.) ( 1.) ( 0.);
+    Ba.set_3d b 6 ( 1.) (-1.) ( 0.);
+    Ba.set_3d b 9 (-1.) (-1.) ( 0.);
     let b = Buf.create (`Bigarray b) in
     [ Attr.create Attr.vertex ~dim:3 b ]
   in 
   let index =                                            
     let b = Ba.create Bigarray.int32 (2 * 3) in 
-    let i = Ba.seti_3d b 0 0 1 2 in                           (* triangles *) 
-    let _ = Ba.seti_3d b i 2 1 3 in
+    Ba.seti_3d b 0 0 1 2;                           (* triangles *)
+    Ba.seti_3d b 3 2 1 3;
     Buf.create ~unsigned:true (`Bigarray b) 
   in
   Prim.create ~index `Triangles attrs
