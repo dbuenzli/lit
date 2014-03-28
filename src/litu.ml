@@ -68,7 +68,7 @@ module Prim = struct
       done;
       let b = Buf.create (`Bigarray b) in
       let stride = if do_tex then dim + 2 else dim in
-      (Attr.create ~stride ~first:0 Attr.vertex ~dim:3 b) :: 
+      (Attr.create ~stride ~first:0 Attr.vertex ~dim b) :: 
       match tex with 
       | None -> []
       | Some tex -> [ Attr.create ~stride ~first:dim tex ~dim:2 b ]
