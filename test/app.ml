@@ -58,7 +58,8 @@ let select_backend () = (module Lit_gl3 : Lit.Renderer.T)
 (* Configuration *)
 
 type config =  
-  { gl : int * int; 
+  { hidpi : bool;
+    gl : int * int; 
     tick_hz : int; 
     pos : v2; 
     size : size2; 
@@ -84,17 +85,22 @@ let size app = match app.init with
     Size2.v (float w) (float h)
 | _ -> app.config.size 
 
+let surface_size app = match app.init with 
+| `Ok (win, _) -> 
+    let w, h = Sdl.gl_get_drawable_size win in
+    Size2.v (float w) (float h)
+| _ -> app.config.size 
 
 let is_fullscreen a = a.is_fullscreen
 let text_ev a = a.text_ev 
 let set_text_ev a f = 
   a.text_ev <- f; 
   if f then Sdl.start_text_input () else Sdl.stop_text_input () 
-
     
 let default = 
   let exec = Filename.(chop_extension (basename Sys.argv.(0))) in
-  { gl = 3,2; 
+  { hidpi = false;
+    gl = 3,2; 
     tick_hz = 0;
     pos = V2.neg_infinity;
     size = V2.v 600. 400.;
@@ -135,7 +141,8 @@ let create_window c =
   | pos -> Some (truncate (V2.x pos)), Some (truncate (V2.y pos)) 
   in
   let w, h = truncate (Size2.w c.size), truncate (Size2.h c.size) in
-  let w_atts = Sdl.Window.(opengl + resizable) in
+  let atts = Sdl.Window.(opengl + resizable) in
+  let atts = if c.hidpi then Sdl.Window.(atts + allow_highdpi) else atts in
   let set a v = Sdl.gl_set_attribute a v in
   set Sdl.Gl.context_profile_mask Sdl.Gl.context_profile_core >>= fun () -> 
   set Sdl.Gl.context_major_version (fst c.gl)                 >>= fun () -> 
@@ -148,8 +155,8 @@ let create_window c =
   set Sdl.Gl.depth_size 24                                    >>= fun () ->
   set Sdl.Gl.depth_size 24                                    >>= fun () ->
   set Sdl.Gl.multisamplebuffers 1                             >>= fun () ->
-  set Sdl.Gl.multisamplesamples 32                             >>= fun () ->
-  Sdl.create_window ?x ?y ~w ~h c.name w_atts                 >>= fun win -> 
+  set Sdl.Gl.multisamplesamples 32                            >>= fun () ->
+  Sdl.create_window ?x ?y ~w ~h c.name atts                   >>= fun win -> 
   Sdl.gl_create_context win                                   >>= fun ctx -> 
   Sdl.gl_make_current win ctx                                 >>= fun () ->
   Sdl.gl_set_swap_interval 0 >>= fun () -> 
@@ -265,7 +272,7 @@ let keyboard_ev app e state =
 
 let window_ev app e = 
   match Sdl.Event.(window_event_enum (get e window_event_id)) with
-  | `Exposed | `Resized -> callback_ev app (`Env (`Resize (size app)))
+  | `Exposed | `Resized -> callback_ev app (`Env (`Resize (surface_size app)))
   | _ -> ()
 
 let mouse_button_ev app e state =   
@@ -349,7 +356,7 @@ let create config =
   match app.init with 
   | `Ok _ -> 
       callback_ev app (`Env `Init);
-      callback_ev app (`Env (`Resize app.config.size));
+      callback_ev app (`Env (`Resize (surface_size app)));
       app
   | _ -> app
 

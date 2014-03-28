@@ -106,7 +106,8 @@ type ev_ret = [ `Ok | `Error of string | `Yield | `Quit ]
 val select_backend : unit -> (module Lit.Renderer.T)
 
 type config =  
-  { gl : int * int; 
+  { hidpi : bool;
+    gl : int * int; 
     tick_hz : int; 
     pos : v2; 
     size : size2; 
