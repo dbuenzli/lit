@@ -25,50 +25,39 @@ let err_buf_scalar_type k st =
 
 module Prim = struct
 
+  let pusher set b = 
+    let i = ref 0 in 
+    fun x y z -> set b !i x y z; i := !i + 3
+
   let cuboid_dups ?name extents = 
     let x, y, z = V3.(to_tuple (0.5 * extents)) in
     let attrs = 
       let b = Ba.create Bigarray.float32 (8 * 3 * 3) in 
-      let i = Ba.set_3d b 0 (-.x) (-.y) (  z) in (* Front *)
-      let i = Ba.set_3d b i (  x) (-.y) (  z) in
-      let i = Ba.set_3d b i (  x) (  y) (  z) in
-      let i = Ba.set_3d b i (-.x) (  y) (  z) in
-      let i = Ba.set_3d b i (-.x) (-.y) (  z) in (* Bottom *)
-      let i = Ba.set_3d b i (  x) (-.y) (  z) in
-      let i = Ba.set_3d b i (  x) (-.y) (-.z) in
-      let i = Ba.set_3d b i (-.x) (-.y) (-.z) in
-      let i = Ba.set_3d b i (-.x) (-.y) (  z) in (* Left *)
-      let i = Ba.set_3d b i (-.x) (-.y) (-.z) in
-      let i = Ba.set_3d b i (-.x) (  y) (-.z) in
-      let i = Ba.set_3d b i (-.x) (  y) (  z) in
-      let i = Ba.set_3d b i (  x) (-.y) (  z) in (* Right *)
-      let i = Ba.set_3d b i (  x) (-.y) (-.z) in
-      let i = Ba.set_3d b i (  x) (  y) (-.z) in
-      let i = Ba.set_3d b i (  x) (  y) (  z) in
-      let i = Ba.set_3d b i (  x) (  y) (  z) in (* Top *)
-      let i = Ba.set_3d b i (  x) (  y) (-.z) in
-      let i = Ba.set_3d b i (-.x) (  y) (-.z) in
-      let i = Ba.set_3d b i (-.x) (  y) (  z) in
-      let i = Ba.set_3d b i (-.x) (  y) (-.z) in (* Rear *)
-      let i = Ba.set_3d b i (-.x) (-.y) (-.z) in
-      let i = Ba.set_3d b i (  x) (-.y) (-.z) in
-      let _ = Ba.set_3d b i (  x) (  y) (-.z) in
+      let push = pusher Ba.set_3d b in 
+      push (-.x) (-.y) (  z); push (  x) (-.y) (  z); (* Front *)
+      push (  x) (  y) (  z); push (-.x) (  y) (  z);
+      push (-.x) (-.y) (  z); push (  x) (-.y) (  z); (* Bottom *)
+      push (  x) (-.y) (-.z); push (-.x) (-.y) (-.z);
+      push (-.x) (-.y) (  z); push (-.x) (-.y) (-.z); (* Left *)
+      push (-.x) (  y) (-.z); push (-.x) (  y) (  z);
+      push (  x) (-.y) (  z); push (  x) (-.y) (-.z); (* Right *)
+      push (  x) (  y) (-.z); push (  x) (  y) (  z);
+      push (  x) (  y) (  z); push (  x) (  y) (-.z); (* Top *)
+      push (-.x) (  y) (-.z); push (-.x) (  y) (  z);
+      push (-.x) (  y) (-.z); push (-.x) (-.y) (-.z); (* Rear *)
+      push (  x) (-.y) (-.z); push (  x) (  y) (-.z);
       [ Attr.create Attr.vertex ~dim:3 (Buf.create (`Bigarray b)) ]
     in
     let index = 
-      let b = Ba.create Bigarray.int8_unsigned (6 * 2 * 3) in 
-      let i = Ba.set_3d b 0  0  2  3 in (* Front *)
-      let i = Ba.set_3d b i  0  1  2 in 
-      let i = Ba.set_3d b i  4  7  6 in (* Bottom *)
-      let i = Ba.set_3d b i  4  6  5 in 
-      let i = Ba.set_3d b i  8 11 10 in (* Left *)
-      let i = Ba.set_3d b i  8 10  9 in 
-      let i = Ba.set_3d b i 12 14 15 in (* Right *) 
-      let i = Ba.set_3d b i 12 13 14 in 
-      let i = Ba.set_3d b i 16 17 18 in (* Top *)
-      let i = Ba.set_3d b i 16 18 19 in
-      let i = Ba.set_3d b i 20 23 22 in (* Rear *)
-      let _ = Ba.set_3d b i 20 22 21 in
+      let b = Ba.create Bigarray.int8_unsigned (6 * 2 * 3) in
+      let push = pusher Ba.set_3d b in
+      push  0  2  3; push  0  1  2; (* Front *)
+      push  4  7  6; push  4  6  5; (* Bottom *)
+      push  8 11 10; push  8 10  9; (* Left *)
+      push 12 14 15; push 12 13 14; (* Right *) 
+      push 16 17 18; push 16 18 19; (* Top *)
+      push 20 23 22; push 20 22 21; (* Rear *)
+      
       Buf.create (`Bigarray b)
     in
     Prim.create ?name ~index `Triangles attrs 
@@ -77,30 +66,26 @@ module Prim = struct
     let x, y, z = V3.(to_tuple (0.5 * extents)) in
     let attrs = 
       let b = Ba.create Bigarray.float32 (3 * 8) in 
-      let i = Ba.set_3d b 0 (-.x) (-.y) (  z) in 
-      let i = Ba.set_3d b i (  x) (-.y) (  z) in 
-      let i = Ba.set_3d b i (-.x) (  y) (  z) in 
-      let i = Ba.set_3d b i (  x) (  y) (  z) in 
-      let i = Ba.set_3d b i (-.x) (-.y) (-.z) in 
-      let i = Ba.set_3d b i (  x) (-.y) (-.z) in 
-      let i = Ba.set_3d b i (-.x) (  y) (-.z) in 
-      let _ = Ba.set_3d b i (  x) (  y) (-.z) in
+      let push = pusher Ba.set_3d b in
+      push (-.x) (-.y) (  z); (* left, bottom, front *)
+      push (  x) (-.y) (  z); (* right, bottom, front *)
+      push (-.x) (  y) (  z); (* left, top, front *)
+      push (  x) (  y) (  z); (* right, top, front *)
+      push (-.x) (-.y) (-.z); (* left, bottom, rear *)
+      push (  x) (-.y) (-.z); (* right, bottom, rear *)
+      push (-.x) (  y) (-.z); (* left, top, rear *)
+      push (  x) (  y) (-.z); (* right, top, rear *)
       [ Attr.create Attr.vertex ~dim:3 (Buf.create (`Bigarray b)) ]
     in
     let index = 
       let b = Ba.create Bigarray.int8_unsigned (6 * 2 * 3) in
-      let i = Ba.set_3d b 0 0 3 2 in
-      let i = Ba.set_3d b i 0 1 3 in
-      let i = Ba.set_3d b i 0 5 1 in
-      let i = Ba.set_3d b i 0 4 5 in
-      let i = Ba.set_3d b i 0 6 4 in
-      let i = Ba.set_3d b i 0 2 6 in
-      let i = Ba.set_3d b i 1 7 3 in
-      let i = Ba.set_3d b i 1 5 7 in
-      let i = Ba.set_3d b i 2 7 6 in
-      let i = Ba.set_3d b i 2 3 7 in
-      let i = Ba.set_3d b i 4 7 5 in
-      let _ = Ba.set_3d b i 4 6 7 in
+      let push = pusher Ba.set_3d b in
+      push 0 3 2; push 0 1 3; (* Front *) 
+      push 0 5 1; push 0 4 5; (* Bottom *)
+      push 0 6 4; push 0 2 6; (* Left *)
+      push 1 7 3; push 1 5 7; (* Right *)
+      push 2 7 6; push 2 3 7; (* Top *) 
+      push 4 7 5; push 4 6 7; (* Rear *)
       Buf.create (`Bigarray b)
     in
     Prim.create ?name ~index `Triangles attrs 
@@ -128,29 +113,31 @@ module Prim = struct
     let vertex_count = 2 + four_pow (level + 1) in 
     let face_count = 8 * four_pow level in
     let vs = Ba.create Bigarray.float32 (vertex_count * 3) in 
+    let vs_i = ref 0 in 
+    let vs_push x y z = Ba.set_3d vs !vs_i x y z; vs_i := !vs_i + 3 in
     let is = Ba.create Bigarray.int32 (face_count * 3) in
+    let is_i = ref 0 in 
+    let is_push x y z = Ba.seti_3d is !is_i x y z; is_i := !is_i + 3 in
     (* Level 0 isocahedron *)
-    let i = Ba.set_3d vs 0 (  0.) (  0.) (  r) in     
-    let i = Ba.set_3d vs i (  0.) (  0.) (-.r) in 
-    let i = Ba.set_3d vs i (-.ra) (-.ra) ( 0.) in 
-    let i = Ba.set_3d vs i (  ra) (-.ra) ( 0.) in 
-    let i = Ba.set_3d vs i (  ra) (  ra) ( 0.) in     
-    let i = Ba.set_3d vs i (-.ra) (  ra) ( 0.) in
-    let i = ref i in 
-    let k = Ba.seti_3d is 0 0 3 4 in 
-    let k = Ba.seti_3d is k 0 4 5 in 
-    let k = Ba.seti_3d is k 0 5 2 in 
-    let k = Ba.seti_3d is k 0 2 3 in 
-    let k = Ba.seti_3d is k 1 4 3 in 
-    let k = Ba.seti_3d is k 1 5 4 in 
-    let k = Ba.seti_3d is k 1 2 5 in 
-    let k = Ba.seti_3d is k 1 3 2 in 
-    let k = ref k in 
+    vs_push (  0.) (  0.) (  r);
+    vs_push (  0.) (  0.) (-.r);
+    vs_push (-.ra) (-.ra) ( 0.);
+    vs_push (  ra) (-.ra) ( 0.);
+    vs_push (  ra) (  ra) ( 0.);
+    vs_push (-.ra) (  ra) ( 0.);
+    is_push 0 3 4;
+    is_push 0 4 5;
+    is_push 0 5 2; 
+    is_push 0 2 3;
+    is_push 1 4 3; 
+    is_push 1 5 4; 
+    is_push 1 2 5; 
+    is_push 1 3 2;
     (* For each face we split its edges in two, move the new points
        on the sphere and add the resulting faces to the index. Emap 
        allows us to make sure we don't split an edge more than once *) 
     for l = 1 to level do 
-      let face_count = !k / 3 in
+      let face_count = !is_i / 3 in
       let visited = ref Emap.empty (* maps edges to new vertex index. *) in
       for f = 0 to face_count - 1 do
         let fi = f * 3 in
@@ -162,18 +149,19 @@ module Prim = struct
           let e = (p1i, p2i) in 
           try Emap.find e !visited with 
           | Not_found ->
-              let pnewi = !i / 3 in
-              i := Ba.set_v3 vs !i V3.(r * unit (P3.mid p1 p2));
+              let pnewi = !vs_i / 3 in
+              Ba.set_v3 vs !vs_i V3.(r * unit (P3.mid p1 p2));
+              vs_i := !vs_i + 3;
               visited := Emap.add e pnewi !visited;
               pnewi
         in
         let pai = subdivide p1i p2i p1 p2 in 
         let pbi = subdivide p2i p3i p2 p3 in 
         let pci = subdivide p3i p1i p3 p1 in 
-        k := Ba.seti_3d is !k p1i pai pci;
-        k := Ba.seti_3d is !k pai p2i pbi;
-        k := Ba.seti_3d is !k pbi p3i pci; 
-        ignore (Ba.seti_3d is fi pai pbi pci)
+        is_push p1i pai pci;
+        is_push pai p2i pbi;
+        is_push pbi p3i pci;
+        Ba.seti_3d is fi pai pbi pci
       done
     done;
     let attrs = [Attr.create Attr.vertex ~dim:3 (Buf.create (`Bigarray vs))]in 
@@ -199,8 +187,8 @@ module Prim = struct
         for x = 0 to xseg do 
           let y = float y in 
           let x = float x in
-          i := Ba.set_3d b !i (x0 +. x *. dx) (y0 +. y *. dy) 0.; 
-          if do_tex then i := Ba.set_2d b !i (x /. xsegf) (y /. ysegf);
+          Ba.set_3d b !i (x0 +. x *. dx) (y0 +. y *. dy) 0.; i := !i + 3;
+          if do_tex then (Ba.set_2d b !i (x /. xsegf) (y /. ysegf); i := !i + 2)
         done
       done;
       let b = Buf.create (`Bigarray b) in      
@@ -213,11 +201,11 @@ module Prim = struct
     let index = 
       let b = Ba.create Bigarray.int8_unsigned (xseg * yseg * 2 * 3) in 
       let id x y = y * (xseg + 1) + x in 
-      let i = ref 0 in
+      let push = pusher Ba.set_3d b in
       for y = 0 to yseg - 1 do 
         for x = 0 to xseg - 1 do 
-          i := Ba.set_3d b !i (id x y) (id (x+1) (y  )) (id (x+1) (y+1));
-          i := Ba.set_3d b !i (id x y) (id (x+1) (y+1)) (id (x  ) (y+1));
+          push (id x y) (id (x+1) (y  )) (id (x+1) (y+1));
+          push (id x y) (id (x+1) (y+1)) (id (x  ) (y+1))
         done
       done;
       Buf.create (`Bigarray b)
@@ -270,12 +258,12 @@ module Prim = struct
       let v2 = Ba.get_v3 vs (vs_first + vi2 * vs_stride) in 
       let v3 = Ba.get_v3 vs (vs_first + vi3 * vs_stride) in
       let n = V3.(cross (v2 - v1) (v3 - v1)) in
-      ignore (Ba.set_v3 ns (vi1 * 3) (V3.add n (Ba.get_v3 ns (vi1 * 3)))); 
-      ignore (Ba.set_v3 ns (vi2 * 3) (V3.add n (Ba.get_v3 ns (vi2 * 3)))); 
-      ignore (Ba.set_v3 ns (vi3 * 3) (V3.add n (Ba.get_v3 ns (vi3 * 3))));
+      Ba.set_v3 ns (vi1 * 3) (V3.add n (Ba.get_v3 ns (vi1 * 3))); 
+      Ba.set_v3 ns (vi2 * 3) (V3.add n (Ba.get_v3 ns (vi2 * 3))); 
+      Ba.set_v3 ns (vi3 * 3) (V3.add n (Ba.get_v3 ns (vi3 * 3)));
     done; 
     for i = 0 to (count / 3) - 1 do 
-      ignore (Ba.set_v3 ns (i * 3) (V3.unit (Ba.get_v3 ns (i * 3))))
+      Ba.set_v3 ns (i * 3) (V3.unit (Ba.get_v3 ns (i * 3)))
     done
     
   let with_normals ?(scalar_type = `Float32)  ?name p =

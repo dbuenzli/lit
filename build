@@ -10,7 +10,7 @@ OCAMLBUILD=${OCAMLBUILD:="ocamlbuild -tag debug -classic-display \
 action () 
 {
     case $1 in
-      default)      $OCAMLBUILD lit.cmx ;;
+      default)      $OCAMLBUILD lit.cmx litu.cmx;;
       doc)          shift; pkg-doc $* doc/dev-api.docdir ;;
       api-doc)      shift; pkg-doc $* doc/api.docdir ;;
       clean)        $OCAMLBUILD -clean ;;
