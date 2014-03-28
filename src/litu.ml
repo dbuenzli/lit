@@ -29,7 +29,7 @@ module Prim = struct
     let i = ref 0 in 
     fun x y z -> set b !i x y z; i := !i + 3
 
-  let rect ?name ?tex ?(segs = Size2.unit) spec =
+  let rect ?name ?tex ?(segs = Size2.unit) ?(d2 = false) spec =
     let do_tex = tex <> None in
     let xseg = Float.int_of_round (Size2.w segs) in
     let yseg = Float.int_of_round (Size2.h segs) in
@@ -52,24 +52,29 @@ module Prim = struct
       in
       let vertex_count = (xseg + 1) * (yseg + 1) in
       let tex_size = if do_tex then 2 * vertex_count else 0 in
-      let b = Ba.create Bigarray.float32 (3 * vertex_count + tex_size) in
       let i = ref 0 in
+      let dim, push = match d2 with 
+      | true -> 2, (fun ba x y _ -> Ba.set_2d ba !i x y; i := !i + 2)
+      | false -> 3, (fun ba x y z -> Ba.set_3d ba !i x y z; i := !i + 3)
+      in
+      let b = Ba.create Bigarray.float32 (dim * vertex_count + tex_size) in
       for y = 0 to yseg do 
         for x = 0 to xseg do 
           let y = float y in 
           let x = float x in
-          Ba.set_3d b !i (x0 +. x *. dx) (y0 +. y *. dy) 0.; i := !i + 3;
+          push b (x0 +. x *. dx) (y0 +. y *. dy) 0.;
           if do_tex then (Ba.set_2d b !i (x /. xsegf) (y /. ysegf); i := !i + 2)
         done
       done;
       let b = Buf.create (`Bigarray b) in
-      let stride = if do_tex then 5 else 3 in
+      let stride = if do_tex then dim + 2 else dim in
       (Attr.create ~stride ~first:0 Attr.vertex ~dim:3 b) :: 
       match tex with 
       | None -> []
-      | Some tex -> [ Attr.create ~stride:5 ~first:3 tex ~dim:2 b ]
+      | Some tex -> [ Attr.create ~stride ~first:dim tex ~dim:2 b ]
     in
     let index = 
+      (* TODO use int16_unsigned if there are too many verts. *) 
       let b = Ba.create Bigarray.int8_unsigned (xseg * yseg * 2 * 3) in 
       let id x y = y * (xseg + 1) + x in 
       let push = pusher Ba.set_3d b in

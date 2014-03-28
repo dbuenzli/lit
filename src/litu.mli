@@ -25,9 +25,9 @@ module Prim : sig
 
       {b Note.} All these primitives are [`Triangles] primitives. *)
 
-  val rect : ?name:string -> ?tex:string -> ?segs:Size2.t ->
+  val rect : ?name:string -> ?tex:string -> ?segs:Size2.t -> ?d2:bool ->
     [ `Size of Size2.t | `Box of box2 ] -> prim
-  (** [rect ?name ?tex segs spec] is an axis-aligned Oxy 2D plane 
+  (** [rect ?name ?tex ?d2 segs spec] is an axis-aligned Oxy 2D plane 
       specified according to [spec]:
       {ul 
       {- [`Size s], the plane has extents [s] and is centered
@@ -38,6 +38,9 @@ module Prim : sig
       and [Size2.h segs] along the y-axis ([segs] defaults to
       {!Size2.unit}, its number are rounded to integers). Each segment
       is made of two triangles.
+
+      If [d2] is [true] (defaults to [false]), the primitive's vertex
+      attribute has dimension 2.
 
       If [tex] is specified, 2D texture coordinates are added to 
       the primitive under that attribute name. The bottom left corner
