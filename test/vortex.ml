@@ -6,7 +6,8 @@
 
 (* Animated vortex. 
 
-   Pixel shader due to http://badc0de.jiggawatt.org/ *)
+   Pixel shader due to http://badc0de.jiggawatt.org
+   Used with permission. *)
 
 open Gg
 open Lit
