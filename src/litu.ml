@@ -29,7 +29,7 @@ module Prim = struct
     let i = ref 0 in 
     fun x y z -> set b !i x y z; i := !i + 3
 
-  let rect ?name ?tex ?(segs = Size2.unit) ?(d2 = false) spec =
+  let rect ?tr ?name ?tex ?(segs = Size2.unit) ?(d2 = false) spec =
     let do_tex = tex <> None in
     let xseg = Float.int_of_round (Size2.w segs) in
     let yseg = Float.int_of_round (Size2.h segs) in
@@ -86,7 +86,7 @@ module Prim = struct
       done;
       Buf.create (`Bigarray b)
     in
-    Prim.create ?name ~index `Triangles attrs 
+    Prim.create ?tr ?name ~index `Triangles attrs 
 
   let cuboid_extrema = function
   | `Size s -> 
@@ -96,7 +96,7 @@ module Prim = struct
       if Box3.is_empty b then (0., 0., 0.), (0., 0., 0.) else
       V3.to_tuple (Box3.min b), V3.to_tuple (Box3.max b)
 
-  let cuboid_dups ?name spec = 
+  let cuboid_dups ?tr ?name spec = 
     let attrs =
       let ba = Ba.create Bigarray.float32 (8 * 3 * 3) in 
       let push = pusher Ba.set_3d ba in 
@@ -121,9 +121,9 @@ module Prim = struct
       
       Buf.create (`Bigarray b)
     in
-    Prim.create ?name ~index `Triangles attrs 
+    Prim.create ?tr ?name ~index `Triangles attrs 
 
-  let cuboid_no_dups ?name spec = 
+  let cuboid_no_dups ?tr ?name spec = 
     let attrs = 
       let ba = Ba.create Bigarray.float32 (3 * 8) in 
       let push = pusher Ba.set_3d ba in
@@ -143,12 +143,12 @@ module Prim = struct
       push 4 7 5; push 4 6 7; (* Far *)
       Buf.create (`Bigarray b)
     in
-    Prim.create ?name ~index `Triangles attrs 
+    Prim.create ?tr ?name ~index `Triangles attrs 
 
-  let cuboid ?name ?(dups = true) spec =
-    if dups then cuboid_dups ?name spec else cuboid_no_dups ?name spec
+  let cuboid ?tr ?name ?(dups = true) spec =
+    if dups then cuboid_dups ?tr ?name spec else cuboid_no_dups ?tr ?name spec
 
-  let cube ?name ?dups s = cuboid ?name ?dups (`Size (Size3.v s s s))
+  let cube ?tr ?name ?dups s = cuboid ?tr ?name ?dups (`Size (Size3.v s s s))
 
   (* Sphere *) 
 
@@ -161,7 +161,7 @@ module Prim = struct
   end 
   module Emap = Map.Make (Edge)
 
-  let sphere ?name ?(level = 4) r =
+  let sphere ?tr ?name ?(level = 4) r =
     let ra = r /. sqrt 2. in 
     let four_pow n = 1 lsl (2 * n) in
     let vertex_count = 2 + four_pow (level + 1) in 
@@ -220,7 +220,7 @@ module Prim = struct
     done;
     let attrs = [Attr.create Attr.vertex ~dim:3 (Buf.create (`Bigarray vs))]in 
     let index = Buf.create ~unsigned:true (`Bigarray is) in
-    Prim.create ?name ~index `Triangles attrs
+    Prim.create ?tr ?name ~index `Triangles attrs
     
   (* Functions *) 
   

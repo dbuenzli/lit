@@ -25,9 +25,9 @@ module Prim : sig
 
       {b Note.} All these primitives are [`Triangles] primitives. *)
 
-  val rect : ?name:string -> ?tex:string -> ?segs:Size2.t -> ?d2:bool ->
-    [ `Size of Size2.t | `Box of box2 ] -> prim
-  (** [rect ?name ?tex ?d2 segs spec] is an axis-aligned Oxy 2D plane 
+  val rect : ?tr:m4 -> ?name:string -> ?tex:string -> ?segs:Size2.t -> 
+    ?d2:bool -> [ `Size of Size2.t | `Box of box2 ] -> prim
+  (** [rect tr name tex d2 segs spec] is an axis-aligned Oxy 2D plane 
       specified according to [spec]:
       {ul 
       {- [`Size s], the plane has extents [s] and is centered
@@ -44,11 +44,13 @@ module Prim : sig
 
       If [tex] is specified, 2D texture coordinates are added to 
       the primitive under that attribute name. The bottom left corner
-      of the plane is (0,0) and top right (1,1). *)
+      of the plane is (0,0) and top right (1,1). 
+
+      [tr] and [name] are given to {!Lit.Prim.create}. *)
  
-  val cuboid : ?name:string -> ?dups:bool -> 
+  val cuboid : ?tr:m4 -> ?name:string -> ?dups:bool -> 
     [ `Size of Gg.size3 | `Box of box3 ] -> prim
-  (** [cuboid dups spec] is an axis-aligned cuboid specified according to
+  (** [cuboid tr dups spec] is an axis-aligned cuboid specified according to
       [spec]:
       {ul 
       {- [`Size s], the cuboid has extents [s] and is centered
@@ -56,17 +58,21 @@ module Prim : sig
       {- [`Box b], the cuboid is bounded by [b].}}
       If [dups] is [true] (default) vertices in the mesh are
       triplicated so that per vertex normal computation defines planar
-      facets. *)
+      facets.
 
-  val cube : ?name:string -> ?dups:bool -> float -> prim
-  (** [cube name dups s] is [cube name dups (`Size (Size3.v s s s))]. *)
+      [tr] and [name] are given to {!Lit.Prim.create}. *)
 
-  val sphere : ?name:string -> ?level:int -> float -> prim
-  (** [sphere level r] is a sphere of radius [r] centered 
+  val cube : ?tr:m4 -> ?name:string -> ?dups:bool -> float -> prim
+  (** [cube tr name dups s] is [cube tr name dups (`Size (Size3.v s s s))]. *)
+
+  val sphere : ?tr:m4 -> ?name:string -> ?level:int -> float -> prim
+  (** [sphere tr name level r] is a sphere of radius [r] centered 
       on the origin obtained by subdividing an octahedron ([level = 0]). 
       [level] defaults to [4]. The number of vertices is 4{^level + 1} + 2 and
       the number of triangles is 8 * 4{^ level}. If the number of vertices
-      is greater than 2{^ 31} all sorts of bad things may happen... *) 
+      is greater than 2{^ 31} all sorts of bad things may happen... 
+
+      [tr] and [name] are given to {!Lit.Prim.create}. *) 
 
   (** {1 Functions} *) 
 
