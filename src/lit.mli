@@ -509,6 +509,9 @@ module Uniform : sig
       {b Note} Returns the zero of ['a] if [u] is a builtin. *)
 
   val set_value : 'a t -> 'a -> 'a t
+  val v : 'a t -> 'a -> 'a t 
+  (** [v] is {!set_value}. *)
+
   val set_to_model_to_world : m4 t -> m4 t 
   (** TODO add the rest *)
 
@@ -953,8 +956,12 @@ type renderer
 (** The type for renderers. *)
 
 type op = 
-  { count : int; effect : effect; tr : m4; prim : prim }
+  { count : int; effect : effect; uniforms : Uniform.set; tr : m4; prim : prim }
 (** The type for render operations. *) 
+
+val op : ?count:int -> ?uniforms:Uniform.set -> ?tr:m4 -> effect -> prim -> op
+(** [op count uniforms tr e p] is a render op. [count] defaults to 1. 
+    [uniforms] defaults to {!Uniform.empty}, [tr] to {!M4.id}. *)
 
 (** Renderers *) 
 module Renderer : sig

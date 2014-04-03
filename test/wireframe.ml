@@ -42,9 +42,8 @@ let clears = { Renderer.default_clears with
                Renderer.clear_color = Some Color.white }
 
 let draw r = 
-  (* Render back faces *) 
-  let op = { count = 1; effect = back; tr = M4.of_quat !prim_tr; prim = !prim } 
-  in
+  (* Render back faces *)
+  let op = Lit.op back ~tr:(M4.of_quat !prim_tr) !prim in
   Renderer.add_op r op;
   Renderer.render ~clear:true r; 
   (* Render front faces *) 

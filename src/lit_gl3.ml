@@ -841,62 +841,65 @@ module Prog = struct
   | `Tex t -> t
   | _ -> raise Exit
 
-
-  let bind_uniforms r prog e op =
-    let us = Effect.uniforms e in 
+  let bind_uniforms r prog op =
     let model_to_world = lazy (M4.mul op.tr (Prim.tr op.prim)) in
     let next_active_tex = ref 0 in
-    let bind_uniform name u = match Uniform.find_named us name with 
-    | None -> log_error r (`Msg (str "uniform %s undefined" name))(*TODO*) 
-    | Some v ->
-        let v = match v with 
-        | `Builtin b -> resolve_builtin r model_to_world b 
-        | v -> v 
-        in 
-        let i = ivec in
-        let f = fvec in 
-        try match u.u_type with 
-        | `Int32 dim | `Bool dim ->
-            begin match dim with 
-            | `V1 -> Gl.uniform1i u.u_loc (i 0 v)
-            | `V2 -> Gl.uniform2i u.u_loc (i 0 v) (i 1 v)
-            | `V3 -> Gl.uniform3i u.u_loc (i 0 v) (i 1 v) (i 2 v)
-            | `V4 -> Gl.uniform4i u.u_loc (i 0 v) (i 1 v) (i 2 v) (i 3 v)
-            end 
-        | `UInt32 dim -> 
-            begin match dim with 
-            | `V1 -> Gl.uniform1ui u.u_loc (i 0 v)
-            | `V2 -> Gl.uniform2ui u.u_loc (i 0 v) (i 1 v)
-            | `V3 -> Gl.uniform3ui u.u_loc (i 0 v) (i 1 v) (i 2 v)
-            | `V4 -> Gl.uniform4ui u.u_loc (i 0 v) (i 1 v) (i 2 v) (i 3 v)
-            end
-        | `Float32 dim ->
-            begin match dim with 
-            | `V1 -> Gl.uniform1f u.u_loc (f 0 v)
-            | `V2 -> Gl.uniform2f u.u_loc (f 0 v) (f 1 v)
-            | `V3 -> Gl.uniform3f u.u_loc (f 0 v) (f 1 v) (f 2 v)
-            | `V4 -> Gl.uniform4f u.u_loc (f 0 v) (f 1 v) (f 2 v) (f 3 v)
-            | `M2 -> Gl.uniform_matrix2fv u.u_loc 1 false (m2 v) 
-            | `M3 -> Gl.uniform_matrix3fv u.u_loc 1 false (m3 v) 
-            | `M4 -> Gl.uniform_matrix4fv u.u_loc 1 false (m4 v) 
-            end
-        | `Sampler ->
-            let t = tex v in
-            if t == Tex.nil then 
-              log_error r (`Msg (str "%s uniform value is nil texture" name))
-            else
-            let tid = Tex.setup r t; (Tex.get_info t).Tex.id in
-            let target = Tex.target_enum_of_kind (Tex.kind t) in
-            Gl.active_texture (Gl.texture0 + !next_active_tex); 
-            Gl.bind_texture target tid;
-            Gl.uniform1i u.u_loc !next_active_tex; 
-            incr next_active_tex;
-        | `Unsupported v -> 
-            log_error r (`Msg (str "Unsupported uniform type: %d" v))
-        with Exit -> 
-          log_error r (`Msg (str "uniform value type mismatch %s" name))
-          (*TODO custom error message *)
-    in 
+    let bind_uniform name u = (* TODO improve *) 
+      let v = match Uniform.find_named op.uniforms name with 
+      | None -> Uniform.find_named (Effect.uniforms op.effect) name 
+      | Some _ as v -> v
+      in
+      match v with
+      | None -> log_error r (`Msg (str "uniform %s undefined" name))(*TODO*) 
+      | Some v ->
+          let v = match v with 
+          | `Builtin b -> resolve_builtin r model_to_world b 
+          | v -> v 
+          in 
+          let i = ivec in
+          let f = fvec in 
+          try match u.u_type with 
+          | `Int32 dim | `Bool dim ->
+              begin match dim with 
+              | `V1 -> Gl.uniform1i u.u_loc (i 0 v)
+              | `V2 -> Gl.uniform2i u.u_loc (i 0 v) (i 1 v)
+              | `V3 -> Gl.uniform3i u.u_loc (i 0 v) (i 1 v) (i 2 v)
+              | `V4 -> Gl.uniform4i u.u_loc (i 0 v) (i 1 v) (i 2 v) (i 3 v)
+              end 
+          | `UInt32 dim -> 
+              begin match dim with 
+              | `V1 -> Gl.uniform1ui u.u_loc (i 0 v)
+              | `V2 -> Gl.uniform2ui u.u_loc (i 0 v) (i 1 v)
+              | `V3 -> Gl.uniform3ui u.u_loc (i 0 v) (i 1 v) (i 2 v)
+              | `V4 -> Gl.uniform4ui u.u_loc (i 0 v) (i 1 v) (i 2 v) (i 3 v)
+              end
+          | `Float32 dim ->
+              begin match dim with 
+              | `V1 -> Gl.uniform1f u.u_loc (f 0 v)
+              | `V2 -> Gl.uniform2f u.u_loc (f 0 v) (f 1 v)
+              | `V3 -> Gl.uniform3f u.u_loc (f 0 v) (f 1 v) (f 2 v)
+              | `V4 -> Gl.uniform4f u.u_loc (f 0 v) (f 1 v) (f 2 v) (f 3 v)
+              | `M2 -> Gl.uniform_matrix2fv u.u_loc 1 false (m2 v) 
+              | `M3 -> Gl.uniform_matrix3fv u.u_loc 1 false (m3 v) 
+              | `M4 -> Gl.uniform_matrix4fv u.u_loc 1 false (m4 v) 
+              end
+          | `Sampler ->
+              let t = tex v in
+              if t == Tex.nil then 
+                log_error r (`Msg (str "%s uniform value is nil texture" name))
+              else
+              let tid = Tex.setup r t; (Tex.get_info t).Tex.id in
+              let target = Tex.target_enum_of_kind (Tex.kind t) in
+              Gl.active_texture (Gl.texture0 + !next_active_tex); 
+              Gl.bind_texture target tid;
+              Gl.uniform1i u.u_loc !next_active_tex; 
+              incr next_active_tex;
+          | `Unsupported v -> 
+              log_error r (`Msg (str "Unsupported uniform type: %d" v))
+          with Exit -> 
+            log_error r (`Msg (str "uniform value type mismatch %s" name))
+            (*TODO custom error message *)
+    in
     Smap.iter bind_uniform prog.uniforms 
     
   let bind_prim r prog_info prim =
@@ -1033,7 +1036,7 @@ let init_framebuffer r clear =
 
 let render_op r prog_info op = 
   Prog.bind_prim r prog_info op.prim; 
-  Prog.bind_uniforms r prog_info op.effect op;
+  Prog.bind_uniforms r prog_info op;
   Effect.set_raster_state r op.effect; 
   Effect.set_depth_state r op.effect; 
   match Prim.index op.prim with

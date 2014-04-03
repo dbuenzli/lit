@@ -645,6 +645,8 @@ module Uniform = struct
   | Viewport_o -> (n, V2 v, inj)
   | Viewport_size -> (n, V2 v, inj)
 
+  let v = set_value 
+
   let set_to_model_to_world (n, t, inj) = (n, Model_to_world, inj)
 
   let is_value_builtin : type a. a t -> bool = fun (_, v, _) -> match v with 
@@ -948,7 +950,11 @@ module Effect = struct
   let set_info e i = e.info <- i
 end
 
-type op = { count : int; effect : Effect.t; tr : m4; prim : Prim.t }
+type op = { count : int; effect : Effect.t; uniforms : Uniform.set; 
+            tr : m4; prim : Prim.t }
+
+let op ?(count = 1) ?(uniforms = Uniform.empty) ?(tr = M4.id) effect prim = 
+  { count; effect; uniforms; tr; prim }
 
 module Renderer = struct
 
