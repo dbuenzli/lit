@@ -415,17 +415,27 @@ module Tex : sig
 
       Buffers image data pixel by pixel in row order then 
       layer order, the first pixel of the buffer is the image's 
-      lower left frontmost pixel. 
-
-      Raster, automatically allocates a buffer the data. *) 
+      lower left frontmost pixel. *) 
                
-  val init_of_raster : ?no_buf:bool -> ?sample_format:sample_format -> 
-    ?norm:bool -> raster -> init 
-  (** [init_of_raster] is an [init] value derived from [raster]. This 
-      creates a buffer value (unless [no_buf] is [false]) with the 
-      raster's data and automatically selects a sample format (unless 
-      [sample_format] is provided). [norm] is used to specify the sample 
-      format normalization (see {!sample_format}), it defaults to [true]. *)
+  val init_of_raster : ?buf:bool -> ?cpu_autorelease:bool -> 
+    ?usage:Buf.usage -> ?sample_format:sample_format -> ?norm:bool -> raster ->
+    init
+  (** [init_of_raster r] is a texture init value derived from
+      [raster].  
+      {ul 
+      {- [buf], if [true] (default), a Lit buffer value is created for 
+         the raster's buffer value. [cpu_autorelease] and [usage] are passed
+         to {!Buf.create}.}
+      {- [sample_format], if unspecified it has [r]'s sample format
+         scalar type and dimension.  Packed raster sample formats are mapped
+         to [`D1] texture sample format. [norm] determines the
+         normalization if [sample_format] is unspecified (see
+         {!type:sample_format}, defaults to [true]).}
+      {- The texture kind will be automatically set to [`D1], [`D2] or [`D3] 
+         according to the raster's dimension.}} 
+
+      @raise Invalid_argument If the raster's sample format dimension is 
+      greater than 4. *)
       
   type t = tex
   (** The type for textures. *) 

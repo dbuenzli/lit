@@ -28,6 +28,8 @@ let err_st_mismatch exp fnd =
   str "requested scalar type %a found %a" 
     Ba.pp_scalar_type exp Ba.pp_scalar_type fnd
 
+let err_raster_sf_dim d = str "raster sample format dimension > 4 (%d)" d
+
 let err_prim_underspec = str "one of ?index or ?count must be specified"
 let err_prim_not_uint t = str "index's scalar type not unsigned integer (%s)" t
 let err_prim_attr_dup n = str "attribute %s specified more than once" n
@@ -379,8 +381,34 @@ module Tex = struct
     | `D3 of sample_format * size3 * Buf.t option
     | `Buffer of sample_format * Buf.t ]
 
-  let init_of_raster ?(no_buf = false) ?sample_format ?(norm = true) r = 
-    failwith "TODO"
+  let init_of_raster ?(buf = true) ?cpu_autorelease ?usage ?sample_format 
+      ?(norm = true) r 
+    = 
+    let sample_format = match sample_format with 
+    | Some sf -> sf 
+    | None -> 
+        let rsf = Raster.sample_format r in
+        let st = Raster.Sample.scalar_type rsf in
+        let dim = match Raster.Sample.pack rsf with 
+        | None -> Raster.Sample.dim rsf
+        | Some _ -> 1 
+        in
+        begin match dim with 
+        | 1 -> `D1 (st, norm) 
+        | 2 -> `D2 (st, norm) 
+        | 3 -> `D3 (st, norm) 
+        | 4 -> `D4 (st, norm) 
+        | d -> invalid_arg (err_raster_sf_dim d)
+        end
+    in
+    let buf = 
+      if buf 
+      then Some (Buf.create ?cpu_autorelease ?usage (Raster.buffer r)) 
+      else None
+    in
+    if Raster.d r > 1 then `D3 (sample_format, Raster.size3 r, buf) else 
+    if Raster.h r > 1 then `D2 (sample_format, Raster.size2 r, buf) else 
+    `D1 (sample_format, float (Raster.w r), buf)
 
   type t = 
     { kind : kind; 
