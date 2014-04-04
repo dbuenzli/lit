@@ -26,8 +26,7 @@ let checkboard_raster () =
   done; 
   img
 
-let checkboard_tex () = 
-  let init = 
+let checkboard_tex () =
   Tex.create 
     ~wrap_s:`Clamp_to_edge ~wrap_t:`Clamp_to_edge 
     ~mipmaps:true

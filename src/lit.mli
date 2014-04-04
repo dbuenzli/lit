@@ -375,17 +375,29 @@ module Tex : sig
   type wrap = [ `Repeat | `Mirrored_repeat | `Clamp_to_edge ]
   (** The type for texture wraps *) 
 
+  val pp_wrap : Format.formatter -> wrap -> unit 
+  (** [pp_wrap ppf w] prints a textual representation of [w] on [ppf] *)
+
   type mag_filter = [ `Linear | `Nearest ]
   (** The type for magnification filters. *)
+
+  val pp_mag_filter : Format.formatter -> mag_filter -> unit 
+  (** [pp_mag_filter ppf m] prints a textual representation of [m] on [ppf] *)
 
   type min_filter = 
     [ `Linear | `Linear_mipmap_linear | `Linear_mipmap_nearest
     | `Nearest | `Nearest_mipmap_linear | `Nearest_mipmap_nearest ]
   (** The type for minification filters. *)
 
+  val pp_min_filter : Format.formatter -> min_filter -> unit 
+  (** [pp_mag_filter ppf m] prints a textual representation of [m] on [ppf] *)
+
   type kind = [ `D1 | `D2 | `D3 | `Buffer ]
   (** The type for kinds of textures. TODO add `Cube_map *) 
-    
+
+  val pp_kind : Format.formatter -> kind -> unit 
+  (** [pp_kind ppf k] prints a textual representation of [k] on [ppf] *)
+
   type sample_format = 
     [ `D1 of Ba.scalar_type * bool 
     | `D2 of Ba.scalar_type * bool 
@@ -405,6 +417,10 @@ module Tex : sig
       {b Note.} Renderers may not support all sample formats.
       This can by testing membership in {!Renderer.Tex.sample_formats}. *)
 
+  val pp_sample_format : Format.formatter -> sample_format -> unit 
+  (** [pp_sample_format ppf sf] prints a textual representation of [sp]
+      on [ppf]. *)
+
   type init =
     [ `D1 of sample_format * float * Buf.t option
     | `D2 of sample_format * size2 * Buf.t option
@@ -416,6 +432,9 @@ module Tex : sig
       Buffers image data pixel by pixel in row order then 
       layer order, the first pixel of the buffer is the image's 
       lower left frontmost pixel. *) 
+
+  val pp_init : Format.formatter -> init -> unit 
+  (** [pp_init ppf init] prints a textual representation of [init] on [ppf]. *)
                
   val init_of_raster : ?buf:bool -> ?cpu_autorelease:bool -> 
     ?usage:Buf.usage -> ?sample_format:sample_format -> ?norm:bool -> raster ->
@@ -485,13 +504,27 @@ module Tex : sig
   val set_gpu_update : tex -> bool -> unit
   (** Needs to be called if you change the underlying buffer and 
       want buffer changes to be picked up. *)
+  
   val wrap_s : tex -> wrap 
+  (** [wrap_s t] is [t]'s texturing wrapping mode in the s dimension. *) 
+
   val wrap_t : tex -> wrap 
+  (** [wrap_t t] is [t]'s texturing wrapping mode in the t dimension. *) 
+
   val wrap_r : tex -> wrap 
+  (** [wrap_r t] is [t]'s texturing wrapping mode in the r dimension. *) 
+
   val mipmaps : tex -> bool
+  (** [mipmaps t] is [true] if mipmaps are generated for texture. *) 
+
   val min_filter : tex -> min_filter 
+  (** [min_filter t] is [t]'s minification filter. *) 
+
   val mag_filter : tex -> mag_filter 
+  (** [min_filter t] is [t]'s magnification filter. *) 
+
   val pp : Format.formatter -> tex -> unit
+  (** [pp ppf t] is a textual represenation of [t] on [ppf]. *) 
 
 end
 

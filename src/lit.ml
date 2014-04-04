@@ -356,13 +356,33 @@ end
 (* Textures *) 
 
 module Tex = struct
+  
   type wrap = [ `Repeat | `Mirrored_repeat | `Clamp_to_edge ]
+  let pp_wrap ppf w = pp ppf begin match w with 
+    | `Repeat -> "repeat" | `Mirrored_repeat -> "mirrored-repeat" 
+    | `Clamp_to_edge -> "clamp-to-edge" 
+    end
+
   type mag_filter = [ `Linear | `Nearest ]
   type min_filter = 
     [ `Linear | `Linear_mipmap_linear | `Linear_mipmap_nearest
     | `Nearest | `Nearest_mipmap_linear | `Nearest_mipmap_nearest ]
 
+  let pp_min_filter ppf m = pp ppf begin match m with 
+    | `Linear -> "linear" | `Linear_mipmap_linear -> "linear-mipmap-linear"
+    | `Linear_mipmap_nearest -> "linear-mipmap_nearest" 
+    | `Nearest -> "nearest" 
+    | `Nearest_mipmap_linear -> "nearest-mipmap-linear"
+    | `Nearest_mipmap_nearest -> "nearest-mipmap-nearest"
+    end
+      
+  let pp_mag_filter = pp_min_filter
+
   type kind = [ `D1 | `D2 | `D3 | `Buffer ]
+
+  let pp_kind ppf k = pp ppf begin match k with 
+    | `D1 -> "D1" | `D2 -> "D2" | `D3 -> "D3" | `Buffer -> "Buffer"
+    end
 
   type sample_format = 
     [ `D1 of Ba.scalar_type * bool 
@@ -375,11 +395,53 @@ module Tex = struct
     | `Stencil of [ `UInt8 ]
     | `Depth_stencil of [ `UInt24_UInt8 | `Float32_UInt8 ] ]
 
+  let pp_norm ppf b = pp ppf (if b then "normalized" else "integral")
+  let pp_sample_format ppf (sf : sample_format) = match sf with
+  | `D1 (st, n) -> pp ppf "@[<1>(D1 %a@ %a)@]" Ba.pp_scalar_type st pp_norm n 
+  | `D2 (st, n) -> pp ppf "@[<1>(D2 %a@ %a)@]" Ba.pp_scalar_type st pp_norm n 
+  | `D3 (st, n) -> pp ppf "@[<1>(D3 %a@ %a)@]" Ba.pp_scalar_type st pp_norm n 
+  | `D4 (st, n) -> pp ppf "@[<1>(D4 %a@ %a)@]" Ba.pp_scalar_type st pp_norm n 
+  | `SRGB st -> 
+      pp ppf "@[(sRGB %a)@]" Ba.pp_scalar_type (st :> Ba.scalar_type)
+  | `SRGBA st -> 
+      pp ppf "@[(sRGBA %a)@]" Ba.pp_scalar_type (st :> Ba.scalar_type)
+  | `Stencil st -> 
+      pp ppf "@[<1>(stencil %a)@]" Ba.pp_scalar_type (st :> Ba.scalar_type)
+  | `Depth st -> 
+      pp ppf "@[(depth %s)@]" 
+        begin match st with 
+        | `UInt16 -> "uint16" | `UInt24 -> "uint24" | `Float32 -> "float32" 
+        end
+  | `Depth_stencil st -> 
+      pp ppf "@[(depth_stencil %s)@]" 
+        begin match st with 
+        | `UInt24_UInt8 -> "uint24 uint8"
+        | `Float32_UInt8 -> "float32 uint8"
+        end
+
   type init =
     [ `D1 of sample_format * float * Buf.t option
     | `D2 of sample_format * size2 * Buf.t option
     | `D3 of sample_format * size3 * Buf.t option
     | `Buffer of sample_format * Buf.t ]
+
+  let pp_buf_opt ppf = function 
+  | None -> pp ppf "nobuf" 
+  | Some b -> pp ppf "%a" Buf.pp b 
+
+  let pp_init ppf = function
+  | `D1 (sf, w, buf) -> 
+      pp ppf "@[<1>(D1@ %a@ %g@ %a)@]" 
+        pp_sample_format sf w pp_buf_opt buf
+  | `D2 (sf, s, buf) -> 
+      pp ppf "@[<1>(D2@ %a@ %a@ %a)@]" 
+        pp_sample_format sf V2.pp s pp_buf_opt buf
+  | `D3 (sf, s, buf) -> 
+      pp ppf "@[<1>(D3@ %a@ %a@ %a)@]" 
+        pp_sample_format sf V3.pp s pp_buf_opt buf
+  | `Buffer (sf, buf) ->
+      pp ppf "@[<1>(Buffer %a %a)@]" 
+        pp_sample_format sf Buf.pp buf 
 
   let init_of_raster ?(buf = true) ?cpu_autorelease ?usage ?sample_format 
       ?(norm = true) r 
@@ -478,7 +540,13 @@ module Tex = struct
   let min_filter t = t.min_filter
   let mag_filter t = t.mag_filter 
 
-  let pp ppf t = pp ppf "tex pp is TODO" 
+  let pp ppf t = 
+    pp ppf "@[<1>(tex@ %a@ %a@ %a@ @[<1>(wrap@ %a@ %a@ %a)@]@ 
+            @[<1>(mimaps@ %a)@]@ @[<1>(min@ %a)@]@ @[<1>(mag@ %a)@] %a)@]"
+      pp_kind t.kind pp_sample_format t.sample_format V3.pp t.size 
+      pp_wrap t.wrap_s pp_wrap t.wrap_t pp_wrap t.wrap_t
+      Format.pp_print_bool t.mipmaps pp_min_filter t.min_filter 
+      pp_mag_filter t.mag_filter pp_buf_opt t.buf
 
   (* Renderer info *) 
 
