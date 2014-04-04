@@ -9,25 +9,30 @@
 open Gg
 open Lit
 
+let checkboard_raster () = 
+  let w, h = 64, 64 in
+  let sf = Raster.Sample.(format rgb_l `UInt8) in
+  let len = Raster.Sample.scalar_count ~w ~h sf in
+  let buf = Ba.create Ba.UInt8 len in
+  let img = Raster.v ~w ~h sf (`UInt8 buf) in 
+  let i = ref 0 in
+  for y = 0 to h - 1 do
+    for x = 0 to w - 1 do
+      let xm = if x land 8 = 0 then 1 else 0 in 
+      let ym = if y land 8 = 0 then 1 else 0 in 
+      let l = (xm lxor ym) * 225 in
+      Ba.set_3d buf !i l l l; i := !i + 3
+    done
+  done; 
+  img
+
 let checkboard_tex () = 
-  let img = 
-    let img = Ba.create Ba.UInt8 (64 * 64 * 3) in 
-    let i = ref 0 in
-    for y = 0 to 63 do
-      for x = 0 to 63 do
-        let xm = if x land 8 = 0 then 1 else 0 in 
-        let ym = if y land 8 = 0 then 1 else 0 in 
-        let l = (xm lxor ym) * 225 in
-        Ba.set_3d img !i l l l; i := !i + 3
-      done
-    done; 
-    Buf.create (`UInt8 img)
-  in
-  let sample_format = `D3 (`UInt8, true) in
+  let init = 
   Tex.create 
     ~wrap_s:`Clamp_to_edge ~wrap_t:`Clamp_to_edge 
-    ~mipmaps:true ~min_filter:`Linear_mipmap_linear ~mag_filter:`Linear
-    (`D2 (sample_format, Size2.v 64. 64., Some img))
+    ~mipmaps:true
+    ~min_filter:`Linear_mipmap_linear ~mag_filter:`Linear
+    (Tex.init_of_raster (checkboard_raster ()))
 
 let program = 
   let checkboard = Uniform.tex "checkboard" (checkboard_tex ()) in
