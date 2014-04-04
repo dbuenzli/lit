@@ -386,16 +386,11 @@ module Tex = struct
 
   type kind = [ `D1 | `D2 | `D3 | `Buffer ]
 
-  type scalar_type = 
-    [ `Int8 | `Int16 | `Int32 | `Int64
-    | `UInt8 | `UInt16 | `UInt32 | `UInt64
-    | `Float16 | `Float32 | `Float64 ]
-
   type sample_format = 
-    [ `D1 of scalar_type * bool 
-    | `D2 of scalar_type * bool 
-    | `D3 of scalar_type * bool 
-    | `D4 of scalar_type * bool
+    [ `D1 of Buf.scalar_type * bool 
+    | `D2 of Buf.scalar_type * bool 
+    | `D3 of Buf.scalar_type * bool 
+    | `D4 of Buf.scalar_type * bool
     | `SRGB of [ `UInt8 ]
     | `SRGBA of [ `UInt8 ]
     | `Depth of [ `UInt16 | `UInt24 | `Float32 ]
