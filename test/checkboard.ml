@@ -11,7 +11,7 @@ open Lit
 
 let checkboard_tex () = 
   let img = 
-    let img = Ba.create Bigarray.int8_unsigned (64 * 64 * 3) in 
+    let img = Ba.create Ba.UInt8 (64 * 64 * 3) in 
     let i = ref 0 in
     for y = 0 to 63 do
       for x = 0 to 63 do
@@ -21,7 +21,7 @@ let checkboard_tex () =
         Ba.set_3d img !i l l l; i := !i + 3
       done
     done; 
-    Buf.create (`Bigarray img)
+    Buf.create (`UInt8 img)
   in
   let sample_format = `D3 (`UInt8, true) in
   Tex.create 

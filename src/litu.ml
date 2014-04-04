@@ -16,7 +16,7 @@ let err_no_cpu_buf b = str "%s: no CPU buffer" b
 let err_dim k dim = str "%s: unsupported dimension (%d)" k dim
 let err_prim_kind k = str "unsupported primitive kind (%a)" Prim.pp_kind k
 let err_buf_scalar_type k st = 
-  str "%s: unsupported buffer scalar type (%a)" k Buf.pp_scalar_type st
+  str "%s: unsupported buffer scalar type (%a)" k Ba.pp_scalar_type st
 
 (* Primitives *) 
 
@@ -54,7 +54,7 @@ module Prim = struct
       | true -> 2, (fun ba x y _ -> Ba.set_2d ba !i x y; i := !i + 2)
       | false -> 3, (fun ba x y z -> Ba.set_3d ba !i x y z; i := !i + 3)
       in
-      let b = Ba.create Bigarray.float32 (dim * vertex_count + tex_size) in
+      let b = Ba.create Ba.Float32 (dim * vertex_count + tex_size) in
       for y = 0 to yseg do 
         for x = 0 to xseg do 
           let y = float y in 
@@ -63,7 +63,7 @@ module Prim = struct
           if do_tex then (Ba.set_2d b !i (x /. xsegf) (y /. ysegf); i := !i + 2)
         done
       done;
-      let b = Buf.create (`Bigarray b) in
+      let b = Buf.create (`Float32 b) in
       let stride = if do_tex then dim + 2 else dim in
       (Attr.create ~stride ~first:0 Attr.vertex ~dim b) :: 
       match tex with 
@@ -72,7 +72,7 @@ module Prim = struct
     in
     let index = 
       (* TODO use int16_unsigned if there are too many verts. *) 
-      let b = Ba.create Bigarray.int8_unsigned (xseg * yseg * 2 * 3) in 
+      let b = Ba.create Ba.UInt8 (xseg * yseg * 2 * 3) in 
       let id x y = y * (xseg + 1) + x in 
       let push = pusher Ba.set_3d b in
       for y = 0 to yseg - 1 do 
@@ -81,7 +81,7 @@ module Prim = struct
           push (id x y) (id (x+1) (y+1)) (id (x  ) (y+1))
         done
       done;
-      Buf.create (`Bigarray b)
+      Buf.create (`UInt8 b)
     in
     Prim.create ?tr ?name ~index `Triangles attrs 
 
@@ -95,7 +95,7 @@ module Prim = struct
 
   let cuboid_dups ?tr ?name spec = 
     let attrs =
-      let ba = Ba.create Bigarray.float32 (8 * 3 * 3) in 
+      let ba = Ba.create Ba.Float32 (8 * 3 * 3) in 
       let push = pusher Ba.set_3d ba in 
       let (l, b, n), (r, t, f) = cuboid_extrema spec in
       push l b n; push r b n; push r t n; push l t n; (* Near *)
@@ -104,10 +104,10 @@ module Prim = struct
       push r b n; push r b f; push r t f; push r t n; (* Right *)
       push r t n; push r t f; push l t f; push l t n; (* Top *)
       push l t f; push l b f; push r b f; push r t f; (* Far *)
-      [ Attr.create Attr.vertex ~dim:3 (Buf.create (`Bigarray ba)) ]
+      [ Attr.create Attr.vertex ~dim:3 (Buf.create (`Float32 ba)) ]
     in
     let index = 
-      let b = Ba.create Bigarray.int8_unsigned (6 * 2 * 3) in
+      let b = Ba.create Ba.UInt8 (6 * 2 * 3) in
       let push = pusher Ba.set_3d b in
       push  0  2  3; push  0  1  2; (* Near *)
       push  4  7  6; push  4  6  5; (* Bottom *)
@@ -115,22 +115,21 @@ module Prim = struct
       push 12 14 15; push 12 13 14; (* Right *) 
       push 16 17 18; push 16 18 19; (* Top *)
       push 20 23 22; push 20 22 21; (* Far *)
-      
-      Buf.create (`Bigarray b)
+      Buf.create (`UInt8 b)
     in
     Prim.create ?tr ?name ~index `Triangles attrs 
 
   let cuboid_no_dups ?tr ?name spec = 
     let attrs = 
-      let ba = Ba.create Bigarray.float32 (3 * 8) in 
+      let ba = Ba.create Ba.Float32 (3 * 8) in 
       let push = pusher Ba.set_3d ba in
       let (l, b, n), (r, t, f) = cuboid_extrema spec in
       push l b n; push r b n; push l t n; push r t n; (* Near *)
       push l b f; push r b f; push l t f; push r t f; (* Far *) 
-      [ Attr.create Attr.vertex ~dim:3 (Buf.create (`Bigarray ba)) ]
+      [ Attr.create Attr.vertex ~dim:3 (Buf.create (`Float32 ba)) ]
     in
     let index = 
-      let b = Ba.create Bigarray.int8_unsigned (6 * 2 * 3) in
+      let b = Ba.create Ba.UInt8 (6 * 2 * 3) in
       let push = pusher Ba.set_3d b in
       push 0 3 2; push 0 1 3; (* Front *) 
       push 0 5 1; push 0 4 5; (* Bottom *)
@@ -138,7 +137,7 @@ module Prim = struct
       push 1 7 3; push 1 5 7; (* Right *)
       push 2 7 6; push 2 3 7; (* Top *) 
       push 4 7 5; push 4 6 7; (* Far *)
-      Buf.create (`Bigarray b)
+      Buf.create (`UInt8 b)
     in
     Prim.create ?tr ?name ~index `Triangles attrs 
 
@@ -163,10 +162,10 @@ module Prim = struct
     let four_pow n = 1 lsl (2 * n) in
     let vertex_count = 2 + four_pow (level + 1) in 
     let face_count = 8 * four_pow level in
-    let vs = Ba.create Bigarray.float32 (vertex_count * 3) in 
+    let vs = Ba.create Ba.Float32 (vertex_count * 3) in 
     let vs_i = ref 0 in 
     let vs_push x y z = Ba.set_3d vs !vs_i x y z; vs_i := !vs_i + 3 in
-    let is = Ba.create Bigarray.int32 (face_count * 3) in
+    let is = Ba.create Ba.UInt32 (face_count * 3) in
     let is_i = ref 0 in 
     let is_push x y z = Ba.seti_3d is !is_i x y z; is_i := !is_i + 3 in
     (* Level 0 isocahedron *)
@@ -215,8 +214,8 @@ module Prim = struct
         Ba.seti_3d is fi pai pbi pci
       done
     done;
-    let attrs = [Attr.create Attr.vertex ~dim:3 (Buf.create (`Bigarray vs))]in 
-    let index = Buf.create ~unsigned:true (`Bigarray is) in
+    let attrs = [Attr.create Attr.vertex ~dim:3 (Buf.create (`Float32 vs))]in 
+    let index = Buf.create (`UInt32 is) in
     Prim.create ?tr ?name ~index `Triangles attrs
     
   (* Functions *) 
@@ -238,14 +237,14 @@ module Prim = struct
         in
         match Buf.scalar_type b with 
         | `UInt8 -> 
-            let ba = get_cpu b Bigarray.int8_unsigned in 
+            let ba = get_cpu b Ba.UInt8 in 
             fun () -> if !i = max then assert false else (incr i; ba.{!i})
         | `UInt16 -> 
-            let ba = get_cpu b Bigarray.int16_unsigned in 
+            let ba = get_cpu b Ba.UInt16 in 
             fun () -> if !i = max then assert false else (incr i; ba.{!i})
         | `UInt32 -> 
             (* That's actually the culprit, it's annoying. *) 
-            let ba = get_cpu b Bigarray.int32 in
+            let ba = get_cpu b Ba.UInt32 in
             fun () -> if !i = max then assert false else 
               (incr i; Int32.to_int (ba.{!i}))
         | _ -> assert false (* This is guaranted by Prim.create *) 
@@ -295,16 +294,18 @@ module Prim = struct
           let count = 
             (Ba.length vs + (vs_stride - dim) - vs_first) / vs_stride
           in
-          let ns = Ba.create ns_ba_kind (3 * count) in 
+          let ns = Ba.create ns_ba_kind (3 * count) in
           do_normals ~index ~tri_count ~vs ~vs_first ~vs_stride ~ns; 
-          Attr.create Attr.normal ~dim:3 (Buf.create (`Bigarray ns))
+          ns
       in
-      match Buf.scalar_type vs, scalar_type with 
-      | `Float32, `Float32 -> do_it Bigarray.float32 Bigarray.float32
-      | `Float32, `Float64 -> do_it Bigarray.float32 Bigarray.float64
-      | `Float64, `Float32 -> do_it Bigarray.float64 Bigarray.float32
-      | `Float64, `Float64 -> do_it Bigarray.float64 Bigarray.float64
+      let init = match Buf.scalar_type vs, scalar_type with 
+      | `Float32, `Float32 -> `Float32 (do_it Ba.Float32 Ba.Float32)
+      | `Float32, `Float64 -> `Float64 (do_it Ba.Float32 Ba.Float64)
+      | `Float64, `Float32 -> `Float32 (do_it Ba.Float64 Ba.Float32)
+      | `Float64, `Float64 -> `Float64 (do_it Ba.Float64 Ba.Float64)
       | st, _ -> invalid_arg (err_buf_scalar_type "vertex attribute" st)
+      in
+      Attr.create Attr.normal ~dim:3 (Buf.create init)
     in
     let attrs = 
       let not_normal a = Attr.name a <> Attr.normal in

@@ -21,15 +21,15 @@ module Smap = Map.Make (String)
 module Gl_hi = struct                         (* Wraps a few Gl functions. *) 
 
   let get_string len =
-    let a = Ba.create Bigarray.char len in
+    let a = Bigarray.Array1.create Bigarray.char Bigarray.c_layout len in
     fun f -> f a; Gl.string_of_bigarray a
 
   let get_int =
-    let a = Ba.create Bigarray.int32 1 in
+    let a = Ba.create Ba.Int32 1 in
     fun f -> f a; Int32.to_int a.{0}
         
   let set_int = 
-    let a = Ba.create Bigarray.int32 1 in 
+    let a = Ba.create Ba.Int32 1 in 
     fun f id -> a.{0} <- Int32.of_int id; f a
         
   (* Buffers objects *) 
@@ -231,9 +231,10 @@ module Buf = struct
      on the returned big array in info, and set its length to 
      zero once we unmap (would need to do it in C I guess).  *)
 
-  let map r access b kind = 
+  let map r access b st = 
     setup r b; 
-    check_kind b kind;
+    check_ba_scalar_type b st;
+    let kind = Ba.ba_kind_of_ba_scalar_type st in
     let info = get_info b in 
     let access = enum_of_access access in
     let count = Buf.gpu_count b in 
@@ -650,15 +651,15 @@ module Prog = struct
     Gl.delete_program i.id
 
   (* Used by setup_info, avoid allocating them all the time *) 
-  let size_cell = Ba.create Bigarray.int32 1
-  let type_cell = Ba.create Bigarray.int32 1
+  let size_cell = Ba.create Ba.Int32 1
+  let type_cell = Ba.create Ba.Int32 1
 
   let setup_info r prog id =     (* lookup attributes and uniform specs *) 
     let cell_val a = Int32.to_int a.{0} in
     let len1 = Gl_hi.get_program_int id Gl.active_attribute_max_length in
     let len2 = Gl_hi.get_program_int id Gl.active_uniform_max_length in 
     let len = max len1 len2 + 1 in
-    let name = Ba.create Bigarray.char len in 
+    let name = Bigarray.Array1.create Bigarray.char Bigarray.c_layout len in 
     let a_count = Gl_hi.get_program_int id Gl.active_attributes in 
     let attrs = ref Smap.empty in
     for i = 0 to a_count - 1 do
@@ -813,7 +814,7 @@ module Prog = struct
       end
   | _ -> raise Exit 
       
-  let mc = Ba.create Bigarray.float32 16
+  let mc = Ba.create Ba.Float32 16
   let m2 = function 
   | `M2 m -> 
       let open M2 in
@@ -929,7 +930,7 @@ module Prog = struct
                 let dim = Attr.dim attr in
                 let scalar_type = buf_info.Buf.scalar_type in
                 let n = Attr.normalize attr in 
-                let bytes = Buf.(scalar_type_byte_count (scalar_type buf)) in
+                let bytes = Ba.scalar_type_byte_count (Buf.scalar_type buf) in
                 let stride = Attr.stride attr * bytes in 
                 let first = `Offset (Attr.first attr * bytes) in 
                 let int_attr = match attr_info.a_type with 

@@ -24,35 +24,13 @@ type buf
 
 (** Buffers.
 
-    Buffers are linear arrays of scalars of a given {{!type:scalar_type}scalar
+    Buffers are linear arrays of scalars of a given {{!Gg.Ba.scalar_type}scalar
     type}. At a given point in time the scalars may exist only on the
     CPU side, only on the GPU side or on both sides (synchronized or not).
 
     Some functions on buffers need a renderer, see {!Renderer.Buf}. *)
 module Buf : sig
-
-  (** {1 Scalar types} *) 
-
-  type scalar_type = 
-    [ `Int8 | `Int16 | `Int32 | `Int64
-    | `UInt8 | `UInt16 | `UInt32 | `UInt64
-    | `Float16 | `Float32 | `Float64 ] 
-  (** The type for scalar types. *) 
-
-  val scalar_type_byte_count : scalar_type -> int
-  (** [scalar_type_byte_count st] is the number of bytes used by [st]. *) 
-
-  val scalar_type_of_bigarray_kind : ?unsigned:bool -> 
-    ('a, 'b) Bigarray.kind -> scalar_type option
-  (** [scalar_type_of_bigarray_kind k] is the scalar type of [k] (if any). 
-      [unsigned] is only used for indicating wheter {!Bigarray.int32} 
-      should be mapped to [`UInt32] rather than [`Int32] 
-      (defaults to [false]). *)
   
-  val pp_scalar_type : Format.formatter -> scalar_type -> unit
-  (** [pp_scalar_type ppf st] prints and unspecified representation 
-      of [st] on [ppf]. *) 
-
   (** {1 Buffers} *) 
 
   type usage = 
@@ -76,23 +54,23 @@ module Buf : sig
       [ppf]. *) 
 
   type ('a, 'b) init = 
-    [ `Cpu of scalar_type * int
-    | `Bigarray of ('a, 'b) bigarray
-    | `Gpu of scalar_type * int ]
+    [ Gg.buffer
+    | `Cpu of Ba.scalar_type * int
+    | `Gpu of Ba.scalar_type * int ]
   (** The type for buffer data initialisation. 
       {ul 
+      {- {!Gg.buffer} value, uses the buffer for the CPU side buffer and will 
+         allocate a corresponding buffer on the GPU.}
       {- [`Cpu (st, count)], allocates a CPU side buffer of scalar type 
          [st] with [count] scalars and will allocate a corresponding buffer
          on the GPU.}
-      {- [`Bigarray b], uses [b] for the CPU side buffer and will 
-         allocate a corresponding buffer on the GPU.}
       {- [`Gpu (st, count)], allocates no CPU side buffer, will allocate 
          a GPU buffer of scalar type [st] with [count] scalars.}} *) 
 
   type t = buf
   (** The type for buffers. *) 
  
-  val create : ?unsigned:bool -> ?cpu_autorelease:bool ->
+  val create : ?cpu_autorelease:bool ->
     ?usage:usage -> ('a, 'b) init -> buf
    (** [create unsigned cpu_autorelease usage init] is a buffer value such that:
        {ul
@@ -103,9 +81,7 @@ module Buf : sig
           (defaults to [`Static_draw]).}
        {- [cpu_autorelease], if [true] (default) the CPU buffer is
           automatically released by {{!set_cpu_}setting} it to [None] once 
-          it is uploaded to the GPU buffer.}
-       {- [unsigned] is used to treat a {!Bigarray.int32} in a [`Cpu_bigarray]
-          initialisation as a [`UInt32] scalar type (defaults to [false]).}}
+          it is uploaded to the GPU buffer.}}
 
        Note that while CPU and GPU buffer length may change, their scalar 
        type is immutable.
@@ -116,7 +92,7 @@ module Buf : sig
   val usage : buf -> usage
   (** [usage b] is the usage of [b]. *) 
 
-  val scalar_type : buf -> scalar_type
+  val scalar_type : buf -> Ba.scalar_type
   (** [scalar_type b] is the scalar type of [b]. *) 
 
   val gpu_count : buf -> int
@@ -142,13 +118,13 @@ module Buf : sig
   val cpu_exists : buf -> bool 
   (** [cpu_exists b] is [true] if the CPU buffer of [b] exists. *) 
 
-  val cpu : buf -> ('a, 'b) Bigarray.kind -> ('a, 'b) bigarray option
-  (** [cpu b kind] is the CPU buffer of [b] (if any).
+  val cpu : buf -> ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray option
+  (** [cpu b st] is the CPU buffer of [b] (if any).
       
       {b Note.} If you want changes you made to the buffer to be picked 
       up by the GPU side buffer you must call {!set_gpu_upload}.
 
-      @raise Invalid_argument if [kind] doesn't correspond to the 
+      @raise Invalid_argument if scalar type [st] is not the 
       scalar type of [b]. *)
 
   val set_cpu : buf -> ('a, 'b) bigarray option -> unit
@@ -157,8 +133,8 @@ module Buf : sig
       {b Note.} If you want changes to the scalars to be picked 
       up by the GPU side buffer you must call {!set_gpu_upload}.
 
-      @raise Invalid_argument if the bigarray kind of [b] doesn't 
-      correspond to the scalar type of [b]. *) 
+      @raise Invalid_argument if the bigarray kind of [b] is not compatible
+      with the scalar type of [b]. *) 
 
   val cpu_autorelease : buf -> bool 
   (** [cpu_autorelease buf] is [true] if the CPU buffer is set to [None]
@@ -411,10 +387,10 @@ module Tex : sig
   (** The type for kinds of textures. TODO add `Cube_map *) 
     
   type sample_format = 
-    [ `D1 of Buf.scalar_type * bool 
-    | `D2 of Buf.scalar_type * bool 
-    | `D3 of Buf.scalar_type * bool 
-    | `D4 of Buf.scalar_type * bool
+    [ `D1 of Ba.scalar_type * bool 
+    | `D2 of Ba.scalar_type * bool 
+    | `D3 of Ba.scalar_type * bool 
+    | `D4 of Ba.scalar_type * bool
     | `SRGB of [ `UInt8 ]
     | `SRGBA of [ `UInt8 ]
     | `Depth of [ `UInt16 | `UInt24 | `Float32 ]
@@ -1081,7 +1057,7 @@ module Renderer : sig
       val set_gpu_exists : buf -> bool -> unit
       val cpu_byte_count : buf -> int 
       val cpu_p : buf -> bigarray_any option
-      val check_kind : buf -> ('a, 'b) Bigarray.kind -> unit
+      val check_ba_scalar_type : buf -> ('a, 'b) Ba.ba_scalar_type -> unit
       val info : buf -> Info.t
       val set_info : buf -> Info.t -> unit
     end
@@ -1161,7 +1137,7 @@ module Renderer : sig
 
     module Buf : sig
       val map : t -> [ `R | `W | `RW ]  -> Buf.t -> 
-        ('a, 'b) Bigarray.kind -> ('a, 'b) bigarray 
+        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
       val unmap : t -> Buf.t -> unit
     end
   end 
@@ -1224,8 +1200,8 @@ module Renderer : sig
     (** {1 Mapping GPU buffers in CPU} *) 
 
     val map : renderer -> [ `R | `W | `RW ] -> Buf.t 
-      -> ('a, 'b) Bigarray.kind -> ('a, 'b) bigarray 
-    (** [map r access b kind] maps the GPU buffer of [b] with 
+      -> ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
+    (** [map r access b st] maps the GPU buffer of [b] with 
         access [access].
 
         {b Warning.} A mapped buffer cannot be used in a render
@@ -1233,7 +1209,7 @@ module Renderer : sig
         bigarray becomes invalid. Don't try to access it, it may result
         in program termination.
 
-        @raise Invalid_argument if [kind] does not match [buf]'s
+        @raise Invalid_argument if [st] does not match [buf]'s
         scalar type. *)
 
     val unmap : renderer -> Buf.t -> unit
@@ -1250,8 +1226,6 @@ end
 (** {1 Remarks and tips} 
 
     {ul 
-    {- [to_string] functions are not thread-safe. Thread-safety can 
-       be achieved with [pp] functions.}
     {- For now, [Buf.t], [Geom.t] and [Effect] value should not be shared
        across renderers.}
     {- Note about OpenGL ids represented as [int]s.}} *) 

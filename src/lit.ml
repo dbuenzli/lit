@@ -20,9 +20,13 @@ let err_miss_key n k = str "no %s %s" n k
 let err_miss_attr k = str "no attribute %s" k 
 let err_attr_dim dim = str "invalid attribute dimension %d" dim 
 let err_no_cpu_buffer = str "no cpu buffer" 
-let err_ba_kind kind = str "unsupported bigarray kind for Lit.Buf" 
-let err_ba_kind_mismatch exp = 
-  str "bigarray kind mismatch (scalar type is %s)" exp (* TODO found: ba *)
+
+let err_ba_kind st = 
+  str "bigarray kind not compatible with scalar type %a" Ba.pp_scalar_type st
+
+let err_st_mismatch exp fnd = 
+  str "requested scalar type %a found %a" 
+    Ba.pp_scalar_type exp Ba.pp_scalar_type fnd
 
 let err_prim_underspec = str "one of ?index or ?count must be specified"
 let err_prim_not_uint t = str "index's scalar type not unsigned integer (%s)" t
@@ -55,42 +59,6 @@ module Buf = struct
   (* FIXME: this module has three uses of Obj.magic. It will be 
      possible to eliminate all of them once we have GADTs for bigarray 
      kinds. http://caml.inria.fr/mantis/view.php?id=6064 *) 
-
-  (* Scalar types *) 
-
-  type scalar_type = 
-    [ `Int8 | `Int16 | `Int32 | `Int64
-    | `UInt8 | `UInt16 | `UInt32 | `UInt64
-    | `Float16 | `Float32 | `Float64 ] 
-
-  let scalar_type_byte_count = function 
-  | `UInt8 | `Int8 -> 1
-  | `UInt16 | `Int16 | `Float16 -> 2
-  | `UInt32 | `Int32 | `Float32 -> 4
-  | `UInt64 | `Int64 | `Float64 -> 8
-    
-  let pp_scalar_type ppf st = pp ppf begin match st with 
-    | `Int8 -> "int8" | `UInt8 -> "uint8"
-    | `Int16 -> "int16" | `UInt16 -> "uint16"
-    | `Int32 -> "int32" | `UInt32 -> "uint32" 
-    | `Int64 -> "int64" | `UInt64 -> "uint64"
-    | `Float16 -> "float16" | `Float32 -> "float32" | `Float64 -> "float64"
-    end
-
-  let scalar_type_of_bigarray_kind : 
-    ?unsigned:bool -> ('a, 'b) Bigarray.kind -> scalar_type option = 
-    fun ?(unsigned = false) k -> 
-      let open Bigarray in
-      match Obj.magic k (* FIXME *) with 
-      | k when k = int8_unsigned -> Some `UInt8
-      | k when k = int8_signed -> Some `Int8
-      | k when k = int16_unsigned -> Some `UInt16
-      | k when k = int16_signed -> Some `Int16
-      | k when k = int32 && unsigned -> Some `UInt32
-      | k when k = int32 -> Some `Int32
-      | k when k = float32 -> Some `Float32
-      | k when k = float64 -> Some `Float64
-      | _ -> None
         
   (* Buffers *) 
 
@@ -114,55 +82,56 @@ module Buf = struct
   type bigarray_any = Ba : ('a, 'b) bigarray -> bigarray_any
 
   let create_bigarray_any scalar_type count = match scalar_type with
-  | `Int8 -> Ba (Ba.create Bigarray.int8_signed count) 
-  | `Int16 -> Ba (Ba.create Bigarray.int16_signed count)
-  | `Int32 -> Ba (Ba.create Bigarray.int32 count)
-  | `Int64 -> Ba (Ba.create Bigarray.int64 count)
-  | `UInt8 -> Ba (Ba.create Bigarray.int8_unsigned count)
-  | `UInt16 -> Ba (Ba.create Bigarray.int16_unsigned count)
-  | `UInt32 -> Ba (Ba.create Bigarray.int32 count)
-  | `UInt64 -> Ba (Ba.create Bigarray.int64 count)
-  | `Float16 -> Ba (Ba.create Bigarray.int16_unsigned count)
-  | `Float32 -> Ba (Ba.create Bigarray.float32 count)
-  | `Float64 -> Ba (Ba.create Bigarray.float64 count)
+  | `Int8 -> Ba (Ba.create Ba.Int8 count) 
+  | `Int16 -> Ba (Ba.create Ba.Int16 count)
+  | `Int32 -> Ba (Ba.create Ba.Int32 count)
+  | `Int64 -> Ba (Ba.create Ba.Int64 count)
+  | `UInt8 -> Ba (Ba.create Ba.UInt8 count)
+  | `UInt16 -> Ba (Ba.create Ba.UInt16 count)
+  | `UInt32 -> Ba (Ba.create Ba.UInt32 count)
+  | `UInt64 -> Ba (Ba.create Ba.UInt64 count)
+  | `Float16 -> Ba (Ba.create Ba.Float16 count)
+  | `Float32 -> Ba (Ba.create Ba.Float32 count)
+  | `Float64 -> Ba (Ba.create Ba.Float64 count)
 
   type ('a, 'b) init = 
-    [ `Cpu of scalar_type * int
-    | `Bigarray of ('a, 'b) bigarray
-    | `Gpu of scalar_type * int ]
+    [ Gg.buffer
+    | `Cpu of Ba.scalar_type * int
+    | `Gpu of Ba.scalar_type * int ]
 
   type t = 
     { usage : usage; 
-      scalar_type : scalar_type;
+      scalar_type : Ba.scalar_type;
       mutable gpu_count : int;     
       mutable gpu_exists : bool;   
-      mutable gpu_upload : bool;   
+      mutable gpu_upload : bool;
       mutable cpu_autorelease : bool;
       mutable cpu : bigarray_any option; 
       mutable info : Info.t; }
     
-  let create ?(unsigned = false) ?(cpu_autorelease = true) 
-      ?(usage = `Static_draw) init = 
+  let create ?(cpu_autorelease = true) ?(usage = `Static_draw) init =
+    let create scalar_type ~cpu ~gpu_upload = 
+      { usage; scalar_type; 
+        gpu_count = 0; gpu_exists = false; gpu_upload; 
+        cpu_autorelease; cpu; info = Info.none }
+    in
     match init with 
     | `Cpu (scalar_type, cpu_count) -> 
         let cpu = Some (create_bigarray_any scalar_type cpu_count) in
-        { usage; scalar_type;
-          gpu_count = 0; gpu_exists = false; gpu_upload = true; 
-          cpu_autorelease; cpu; info = Info.none }
-    | `Bigarray ba -> 
-        let kind = Bigarray.Array1.kind ba in 
-        let cpu = Some (Ba ba) in
-        begin match scalar_type_of_bigarray_kind ~unsigned kind with
-        | None -> invalid_arg (err_ba_kind kind)
-        | Some scalar_type ->
-            { usage; scalar_type; 
-              gpu_count = 0; gpu_exists = false; gpu_upload = true;
-              cpu_autorelease; cpu; info = Info.none }
-        end
+        create scalar_type ~cpu ~gpu_upload:true
     | `Gpu (scalar_type, gpu_count) -> 
-        { usage; scalar_type; 
-          gpu_count = 0; gpu_exists = false; gpu_upload = false; 
-          cpu_autorelease; cpu = None; info = Info.none }
+        create scalar_type ~cpu:None ~gpu_upload:false
+    | `Int8 ba -> create `Int8 ~cpu:(Some (Ba ba)) ~gpu_upload:true
+    | `Int16 ba -> create `Int16 ~cpu:(Some (Ba ba)) ~gpu_upload:true
+    | `Int32 ba -> create `Int32 ~cpu:(Some (Ba ba)) ~gpu_upload:true
+    | `Int64 ba -> create `Int64 ~cpu:(Some (Ba ba)) ~gpu_upload:true
+    | `UInt8 ba -> create `UInt8 ~cpu:(Some (Ba ba)) ~gpu_upload:true
+    | `UInt16 ba -> create `UInt16 ~cpu:(Some (Ba ba)) ~gpu_upload:true
+    | `UInt32 ba -> create `UInt32 ~cpu:(Some (Ba ba)) ~gpu_upload:true
+    | `UInt64 ba -> create `UInt64 ~cpu:(Some (Ba ba)) ~gpu_upload:true
+    | `Float16 ba -> create `Float16 ~cpu:(Some (Ba ba)) ~gpu_upload:true
+    | `Float32 ba -> create `Float32 ~cpu:(Some (Ba ba)) ~gpu_upload:true
+    | `Float64 ba -> create `Float64 ~cpu:(Some (Ba ba)) ~gpu_upload:true
         
   let usage b = b.usage 
   let scalar_type b = b.scalar_type
@@ -175,41 +144,48 @@ module Buf = struct
   let set_gpu_upload b u = b.gpu_upload <- u
 
   let cpu_count b = match b.cpu with 
-  | None -> 0 | Some (Ba ba) -> Bigarray.Array1.dim ba 
+  | None -> 0 | Some (Ba ba) -> Ba.length ba
 
   let cpu_exists b = b.cpu <> None
   let cpu_byte_count b = match b.cpu with 
   | None -> 0 
-  | Some (Ba ba) -> 
-      Bigarray.Array1.dim ba * (scalar_type_byte_count b.scalar_type)
+  | Some (Ba ba) -> Ba.length ba * (Ba.scalar_type_byte_count b.scalar_type)
 
-  let cpu : t -> ('a, 'b) Bigarray.kind -> ('a, 'b) bigarray option = 
-    fun b k' -> match b.cpu with
+
+  let check_ba_scalar_type b exp =
+    let st = Ba.scalar_type_of_ba_scalar_type exp in 
+    if st <> b.scalar_type then invalid_arg (err_st_mismatch st b.scalar_type)
+
+  let cpu : type a b. t -> (a, b) Ba.ba_scalar_type -> (a, b) bigarray option =
+    fun b st -> match b.cpu with
     | None -> None
     | Some (Ba ba) ->
-        (* FIXME *) 
-        let k = Bigarray.Array1.kind ba in
-        if k = Obj.magic k' then Obj.magic (Some ba) else 
-        let st = str "%a" pp_scalar_type b.scalar_type in 
-        invalid_arg (err_ba_kind_mismatch st)
+        check_ba_scalar_type b st;
+        (* FIXME can we do something here ? *) 
+        (Obj.magic (Some ba) : (a, b) bigarray option)
 
   let cpu_p b = b.cpu
-  let check_kind b k = 
-    let mismatch () = 
-      let st = str "%a" pp_scalar_type b.scalar_type in
-      invalid_arg (err_ba_kind_mismatch st) 
+
+  let check_kind b k =
+    let open Bigarray in
+    let st = b.scalar_type in
+    let pass = match Obj.magic k (* FIXME *) with 
+    | k when k = int8_signed -> st = `Int8
+    | k when k = int16_signed -> st = `Int16
+    | k when k = int32 -> st = `Int32 || st = `UInt32
+    | k when k = int64 -> st = `Int64 || st = `UInt64
+    | k when k = int8_unsigned -> st = `UInt8
+    | k when k = int16_unsigned -> st = `UInt16 || st = `Float16
+    | k when k = float32 -> st = `Float32
+    | k when k = float64 -> st = `Float64
+    | _ -> false
     in
-    let unsigned = b.scalar_type = `UInt32 in
-    match scalar_type_of_bigarray_kind ~unsigned k with 
-    | None -> mismatch () 
-    | Some st -> if b.scalar_type <> st then mismatch ()
+    if not pass then invalid_arg (err_ba_kind st)
 
   let set_cpu b = function 
   | None -> b.cpu <- None
-  | Some ba -> 
-      check_kind b (Bigarray.Array1.kind ba); 
-      b.cpu <- Some (Ba ba)
-
+  | Some ba -> check_kind b (Bigarray.Array1.kind ba); b.cpu <- Some (Ba ba)
+ 
   let cpu_autorelease b = b.cpu_autorelease
   let set_cpu_autorelease b bool = b.cpu_autorelease <- bool
       
@@ -217,7 +193,7 @@ module Buf = struct
     let gpu = if b.gpu_exists then (str "%d" b.gpu_count) else "none" in 
     let cpu = if b.cpu <> None then (str "%d" (cpu_count b)) else "none" in
     pp ppf "@[<1><buf %a %s/%s (gpu/cpu) %a>@]" 
-      pp_scalar_type b.scalar_type gpu cpu pp_usage b.usage 
+      Ba.pp_scalar_type b.scalar_type gpu cpu pp_usage b.usage 
 
   (* Renderer info *) 
 
@@ -251,7 +227,7 @@ module Attr = struct
   let rename a name = { a with name } 
   let pp ppf a =
     pp ppf "@[<1><attr %s@ %d %a@ @@%d@ +%d>@]"
-      a.name a.dim Buf.pp_scalar_type a.buf.Buf.scalar_type a.first a.stride
+      a.name a.dim Ba.pp_scalar_type a.buf.Buf.scalar_type a.first a.stride
 
   (* Standard attributes names *) 
 
@@ -311,10 +287,10 @@ module Prim = struct
     | None -> if count = None then invalid_arg err_prim_underspec else ()
     | Some b -> 
         begin match Buf.scalar_type b with 
-        | `UInt8 | `UInt16 | `UInt32 | `UInt64 (* TODO possible ? *) -> ()
+        | `UInt8 | `UInt16 | `UInt32 | `UInt64 -> ()
         | `Int8 | `Int16 | `Int32 | `Int64
         | `Float16 | `Float32 | `Float64 as st -> 
-            invalid_arg (err_prim_not_uint (str "%a" Buf.pp_scalar_type st))
+            invalid_arg (err_prim_not_uint (str "%a" Ba.pp_scalar_type st))
         end
     end;
     let add_attr acc a = 
@@ -387,10 +363,10 @@ module Tex = struct
   type kind = [ `D1 | `D2 | `D3 | `Buffer ]
 
   type sample_format = 
-    [ `D1 of Buf.scalar_type * bool 
-    | `D2 of Buf.scalar_type * bool 
-    | `D3 of Buf.scalar_type * bool 
-    | `D4 of Buf.scalar_type * bool
+    [ `D1 of Ba.scalar_type * bool 
+    | `D2 of Ba.scalar_type * bool 
+    | `D3 of Ba.scalar_type * bool 
+    | `D4 of Ba.scalar_type * bool
     | `SRGB of [ `UInt8 ]
     | `SRGBA of [ `UInt8 ]
     | `Depth of [ `UInt16 | `UInt24 | `Float32 ]
@@ -923,7 +899,6 @@ module Effect = struct
   let default_depth = { depth_test = Some `Less; depth_write = true; 
                         depth_offset = (0., 0.) }
 
-
   type t = 
     { raster : raster; 
       depth : depth;
@@ -1111,7 +1086,7 @@ module Renderer = struct
 
     module Buf : sig
       val map : t -> [ `R | `W | `RW ]  -> Buf.t -> 
-        ('a, 'b) Bigarray.kind -> ('a, 'b) bigarray 
+        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
       val unmap : t -> Buf.t -> unit
     end
   end 
