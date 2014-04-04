@@ -70,15 +70,15 @@ module Buf = struct
     | `Dynamic_draw | `Dynamic_read | `Dynamic_copy ]
 
   let pp_usage ppf u = pp ppf begin match u with
-    | `Static_draw -> "static_draw"
-    | `Static_read -> "static_read"
-    | `Static_copy -> "static_copy"
-    | `Stream_draw -> "stream_draw"
-    | `Stream_read -> "stream_read"
-    | `Stream_copy -> "stream_copy"
-    | `Dynamic_draw -> "dynamic_draw"
-    | `Dynamic_read -> "dynamic_read"
-    | `Dynamic_copy -> "dynamic_copy"
+    | `Static_draw -> "static-draw"
+    | `Static_read -> "static-read"
+    | `Static_copy -> "static-copy"
+    | `Stream_draw -> "stream-draw"
+    | `Stream_read -> "stream-read"
+    | `Stream_copy -> "stream-copy"
+    | `Dynamic_draw -> "dynamic-draw"
+    | `Dynamic_read -> "dynamic-read"
+    | `Dynamic_copy -> "dynamic-copy"
     end
       
   type bigarray_any = Ba : ('a, 'b) bigarray -> bigarray_any
@@ -194,8 +194,8 @@ module Buf = struct
   let pp ppf b = 
     let gpu = if b.gpu_exists then (str "%d" b.gpu_count) else "none" in 
     let cpu = if b.cpu <> None then (str "%d" (cpu_count b)) else "none" in
-    pp ppf "@[<1><buf %a %s/%s (gpu/cpu) %a>@]" 
-      Ba.pp_scalar_type b.scalar_type gpu cpu pp_usage b.usage 
+    pp ppf "@[<1>(lit-buf %a @[<1>(cpu %s)@]@ @[<1>(gpu %s)@]@ %a)@]" 
+      Ba.pp_scalar_type b.scalar_type cpu gpu pp_usage b.usage 
 
   (* Renderer info *) 
 
@@ -228,7 +228,7 @@ module Attr = struct
   let normalize a = a.normalize 
   let rename a name = { a with name } 
   let pp ppf a =
-    pp ppf "@[<1><attr %s@ %d %a@ @@%d@ +%d>@]"
+    pp ppf "@[<1>(attr %s@ %d %a@ @@%d@ +%d)@]"
       a.name a.dim Ba.pp_scalar_type a.buf.Buf.scalar_type a.first a.stride
 
   (* Standard attributes names *) 
@@ -254,15 +254,15 @@ module Prim = struct
   let pp_kind ppf kind = pp ppf begin match kind with 
     | `Points -> "points"
     | `Lines -> "lines"
-    | `Line_strip -> "line_strip"
-    | `Line_loop -> "line_loop"
-    | `Lines_adjacency -> "lines_adjacency"
-    | `Line_strip_adjacency -> "line_strip_adjacency"
+    | `Line_strip -> "line-strip"
+    | `Line_loop -> "line-loop"
+    | `Lines_adjacency -> "lines-adjacency"
+    | `Line_strip_adjacency -> "line-strip-adjacency"
     | `Triangles -> "triangles"
-    | `Triangle_strip -> "triangle_strip"
-    | `Triangle_fan -> "triangle_fan"
-    | `Triangles_adjacency -> "triangles_adjacency"
-    | `Triangle_strip_adjacency -> "triangle_strip_adjacency"
+    | `Triangle_strip -> "triangle-strip"
+    | `Triangle_fan -> "triangle-fan"
+    | `Triangles_adjacency -> "triangles-adjacency"
+    | `Triangle_strip_adjacency -> "triangle-strip-adjacency"
     end
  
   (* Primitives *) 
@@ -343,7 +343,7 @@ module Prim = struct
       let pp_sep ppf () = pp ppf ",@ " in
       pp ppf ",@ @[%a@]" (pp_list ~pp_sep pp_attr) attrs
     in
-    pp ppf "@[<1><prim %s %a%a%a@ %dvs%a%a>@]"
+    pp ppf "@[<1>(prim %s %a%a%a@ %dvs%a%a)@]"
       p.name pp_kind p.kind pp_tr p.tr pp_first p.first (count_now p) 
       pp_index p.index pp_attrs (attrs p)
 
@@ -397,23 +397,28 @@ module Tex = struct
 
   let pp_norm ppf b = pp ppf (if b then "normalized" else "integral")
   let pp_sample_format ppf (sf : sample_format) = match sf with
-  | `D1 (st, n) -> pp ppf "@[<1>(D1 %a@ %a)@]" Ba.pp_scalar_type st pp_norm n 
-  | `D2 (st, n) -> pp ppf "@[<1>(D2 %a@ %a)@]" Ba.pp_scalar_type st pp_norm n 
-  | `D3 (st, n) -> pp ppf "@[<1>(D3 %a@ %a)@]" Ba.pp_scalar_type st pp_norm n 
-  | `D4 (st, n) -> pp ppf "@[<1>(D4 %a@ %a)@]" Ba.pp_scalar_type st pp_norm n 
+  | `D1 (st, n) -> 
+      pp ppf "@[<1>(tex-sf D1 %a@ %a)@]" Ba.pp_scalar_type st pp_norm n 
+  | `D2 (st, n) -> 
+      pp ppf "@[<1>(tex-sf D2 %a@ %a)@]" Ba.pp_scalar_type st pp_norm n 
+  | `D3 (st, n) -> 
+      pp ppf "@[<1>(tex-sf D3 %a@ %a)@]" Ba.pp_scalar_type st pp_norm n 
+  | `D4 (st, n) -> 
+      pp ppf "@[<1>(tex-sf D4 %a@ %a)@]" Ba.pp_scalar_type st pp_norm n 
   | `SRGB st -> 
-      pp ppf "@[(sRGB %a)@]" Ba.pp_scalar_type (st :> Ba.scalar_type)
+      pp ppf "@[(tex-sf sRGB %a)@]" Ba.pp_scalar_type (st :> Ba.scalar_type)
   | `SRGBA st -> 
-      pp ppf "@[(sRGBA %a)@]" Ba.pp_scalar_type (st :> Ba.scalar_type)
+      pp ppf "@[(tex-sf sRGBA %a)@]" Ba.pp_scalar_type (st :> Ba.scalar_type)
   | `Stencil st -> 
-      pp ppf "@[<1>(stencil %a)@]" Ba.pp_scalar_type (st :> Ba.scalar_type)
+      pp ppf "@[<1>(tex-sf stencil %a)@]" 
+        Ba.pp_scalar_type (st :> Ba.scalar_type)
   | `Depth st -> 
-      pp ppf "@[(depth %s)@]" 
+      pp ppf "@[(tex-sf depth %s)@]" 
         begin match st with 
         | `UInt16 -> "uint16" | `UInt24 -> "uint24" | `Float32 -> "float32" 
         end
   | `Depth_stencil st -> 
-      pp ppf "@[(depth_stencil %s)@]" 
+      pp ppf "@[(tex-sf depth_stencil %s)@]" 
         begin match st with 
         | `UInt24_UInt8 -> "uint24 uint8"
         | `Float32_UInt8 -> "float32 uint8"
@@ -431,16 +436,16 @@ module Tex = struct
 
   let pp_init ppf = function
   | `D1 (sf, w, buf) -> 
-      pp ppf "@[<1>(D1@ %a@ %g@ %a)@]" 
+      pp ppf "@[<1>(tex-init D1@ %a@ %g@ %a)@]" 
         pp_sample_format sf w pp_buf_opt buf
   | `D2 (sf, s, buf) -> 
-      pp ppf "@[<1>(D2@ %a@ %a@ %a)@]" 
+      pp ppf "@[<1>(tex-init D2@ %a@ %a@ %a)@]" 
         pp_sample_format sf V2.pp s pp_buf_opt buf
   | `D3 (sf, s, buf) -> 
-      pp ppf "@[<1>(D3@ %a@ %a@ %a)@]" 
+      pp ppf "@[<1>(tex-init D3@ %a@ %a@ %a)@]" 
         pp_sample_format sf V3.pp s pp_buf_opt buf
   | `Buffer (sf, buf) ->
-      pp ppf "@[<1>(Buffer %a %a)@]" 
+      pp ppf "@[<1>(tex-init Buffer %a %a)@]" 
         pp_sample_format sf Buf.pp buf 
 
   let init_of_raster ?(buf = true) ?cpu_autorelease ?usage ?sample_format 
@@ -541,8 +546,8 @@ module Tex = struct
   let mag_filter t = t.mag_filter 
 
   let pp ppf t = 
-    pp ppf "@[<1>(tex@ %a@ %a@ %a@ @[<1>(wrap@ %a@ %a@ %a)@]@ 
-            @[<1>(mimaps@ %a)@]@ @[<1>(min@ %a)@]@ @[<1>(mag@ %a)@] %a)@]"
+    pp ppf "@[<1>(tex@ %a@ %a@ %a@ @[<1>(wrap@ %a@ %a@ %a)@]@ \
+            @[<1>(mipmaps@ %a)@]@ @[<1>(min@ %a)@]@ @[<1>(mag@ %a)@]@ %a)@]"
       pp_kind t.kind pp_sample_format t.sample_format V3.pp t.size 
       pp_wrap t.wrap_s pp_wrap t.wrap_t pp_wrap t.wrap_t
       Format.pp_print_bool t.mipmaps pp_min_filter t.min_filter 
@@ -948,10 +953,8 @@ module View = struct
   let viewport v = v.viewport 
   let set_viewport v b = v.viewport <- b
 
-
   (* Coordinate system transforms *) 
       
-
   let viewport_of_surface view nsc =
     V2.(div (nsc - Box2.o view.viewport) (Box2.size view.viewport))
       
