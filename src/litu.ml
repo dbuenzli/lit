@@ -14,9 +14,7 @@ let str = Format.asprintf
 
 let err_no_cpu_buf b = str "%s: no CPU buffer" b
 let err_dim k dim = str "%s: unsupported dimension (%d)" k dim
-let err_prim_kind k = 
-  str "unsupported primitive kind (%s)" (Prim.kind_to_string k)
-
+let err_prim_kind k = str "unsupported primitive kind (%a)" Prim.pp_kind k
 let err_buf_scalar_type k st = 
   str "%s: unsupported buffer scalar type (%a)" k Buf.pp_scalar_type st
 

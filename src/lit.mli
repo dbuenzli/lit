@@ -274,9 +274,6 @@ module Prim : sig
     | `Triangles_adjacency | `Triangle_strip_adjacency ]
   (** The kind of primitive. Defines how the vertex stream is
       interpreted. *)
-
-  val kind_to_string : kind -> string 
-  (** [to_string kind] is an unspecified textual representation of [kind]. *)
   
   val pp_kind : Format.formatter -> kind -> unit 
   (** [pp_kind ppf kind] prints an unspecified representation of [kind]
