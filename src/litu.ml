@@ -8,7 +8,7 @@ open Gg
 open Lit
 
 
-let str = Format.sprintf
+let str = Format.asprintf
 
 (* Invalid argument strings. *) 
 
@@ -18,8 +18,7 @@ let err_prim_kind k =
   str "unsupported primitive kind (%s)" (Prim.kind_to_string k)
 
 let err_buf_scalar_type k st = 
-  str "%s: unsupported buffer scalar type (%s)" k 
-    (Buf.scalar_type_to_string st)
+  str "%s: unsupported buffer scalar type (%a)" k Buf.pp_scalar_type st
 
 (* Primitives *) 
 

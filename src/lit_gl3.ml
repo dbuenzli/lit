@@ -156,12 +156,15 @@ module Buf = struct
   include Renderer.Private.Buf
 
   let enum_of_scalar_type = function 
-  | `UInt8 -> Gl.unsigned_byte
   | `Int8 -> Gl.byte
-  | `UInt16 -> Gl.unsigned_short
   | `Int16 -> Gl.short
-  | `UInt32 -> Gl.unsigned_int
   | `Int32 -> Gl.int
+  | `Int64 -> failwith "TODO"
+  | `UInt8 -> Gl.unsigned_byte
+  | `UInt16 -> Gl.unsigned_short
+  | `UInt32 -> Gl.unsigned_int
+  | `UInt64 -> failwith "TODO"
+  | `Float16 -> Gl.half_float 
   | `Float32 -> Gl.float
   | `Float64 -> Gl.double
 

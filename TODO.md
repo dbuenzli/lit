@@ -1,3 +1,4 @@
+* FINALIZERS, don't call GL ! no guarantee on thread.
 * `Uniform.viewport_{o,size}` should we still have them in 
   normalized surface coordinate and have a seperate `surface_size`
   builtin ? 

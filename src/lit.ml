@@ -6,17 +6,13 @@
 
 open Gg
 
-let str = Printf.sprintf 
+let str = Format.asprintf
 let pp = Format.fprintf
 let pp_str = Format.pp_print_string
 let rec pp_list ?(pp_sep = Format.pp_print_cut) pp_v ppf = function 
 | [] -> ()
 | v :: vs ->
     pp_v ppf v; if vs <> [] then (pp_sep ppf (); pp_list ~pp_sep pp_v ppf vs)
-
-let to_string_of_formatter pp v =                        (* NOT thread safe. *)
-  Format.fprintf Format.str_formatter "%a" pp v; 
-  Format.flush_str_formatter ()
 
 (* Invalid argument strings *) 
 
@@ -61,24 +57,25 @@ module Buf = struct
      kinds. http://caml.inria.fr/mantis/view.php?id=6064 *) 
 
   (* Scalar types *) 
-  
+
   type scalar_type = 
-    [ `UInt8 | `Int8 | `UInt16 | `Int16 | `UInt32 | `Int32 
-    | `Float32 | `Float64 ] 
+    [ `Int8 | `Int16 | `Int32 | `Int64
+    | `UInt8 | `UInt16 | `UInt32 | `UInt64
+    | `Float16 | `Float32 | `Float64 ] 
 
   let scalar_type_byte_count = function 
   | `UInt8 | `Int8 -> 1
-  | `UInt16 | `Int16 -> 2
+  | `UInt16 | `Int16 | `Float16 -> 2
   | `UInt32 | `Int32 | `Float32 -> 4
-  | `Float64 -> 8
-
-  let scalar_type_to_string = function 
-  | `UInt8 -> "uint8" | `Int8 -> "int8" 
-  | `UInt16 -> "uint16" | `Int16 -> "int16" 
-  | `UInt32 -> "uint32" | `Int32 -> "int32" 
-  | `Float32 -> "float32" | `Float64 -> "float64" 
+  | `UInt64 | `Int64 | `Float64 -> 8
     
-  let pp_scalar_type ppf st = pp ppf "%s" (scalar_type_to_string st)
+  let pp_scalar_type ppf st = pp ppf begin match st with 
+    | `Int8 -> "int8" | `UInt8 -> "uint8"
+    | `Int16 -> "int16" | `UInt16 -> "uint16"
+    | `Int32 -> "int32" | `UInt32 -> "uint32" 
+    | `Int64 -> "int64" | `UInt64 -> "uint64"
+    | `Float16 -> "float16" | `Float32 -> "float32" | `Float64 -> "float64"
+    end
 
   let scalar_type_of_bigarray_kind : 
     ?unsigned:bool -> ('a, 'b) Bigarray.kind -> scalar_type option = 
@@ -117,12 +114,15 @@ module Buf = struct
   type bigarray_any = Ba : ('a, 'b) bigarray -> bigarray_any
 
   let create_bigarray_any scalar_type count = match scalar_type with
-  | `UInt8 -> Ba (Ba.create Bigarray.int8_unsigned count)
   | `Int8 -> Ba (Ba.create Bigarray.int8_signed count) 
-  | `UInt16 -> Ba (Ba.create Bigarray.int16_unsigned count)
   | `Int16 -> Ba (Ba.create Bigarray.int16_signed count)
-  | `UInt32 -> Ba (Ba.create Bigarray.int32 count)
   | `Int32 -> Ba (Ba.create Bigarray.int32 count)
+  | `Int64 -> Ba (Ba.create Bigarray.int64 count)
+  | `UInt8 -> Ba (Ba.create Bigarray.int8_unsigned count)
+  | `UInt16 -> Ba (Ba.create Bigarray.int16_unsigned count)
+  | `UInt32 -> Ba (Ba.create Bigarray.int32 count)
+  | `UInt64 -> Ba (Ba.create Bigarray.int64 count)
+  | `Float16 -> Ba (Ba.create Bigarray.int16_unsigned count)
   | `Float32 -> Ba (Ba.create Bigarray.float32 count)
   | `Float64 -> Ba (Ba.create Bigarray.float64 count)
 
@@ -190,13 +190,13 @@ module Buf = struct
         (* FIXME *) 
         let k = Bigarray.Array1.kind ba in
         if k = Obj.magic k' then Obj.magic (Some ba) else 
-        let st = scalar_type_to_string b.scalar_type in 
+        let st = str "%a" pp_scalar_type b.scalar_type in 
         invalid_arg (err_ba_kind_mismatch st)
 
   let cpu_p b = b.cpu
   let check_kind b k = 
     let mismatch () = 
-      let st = scalar_type_to_string b.scalar_type in
+      let st = str "%a" pp_scalar_type b.scalar_type in
       invalid_arg (err_ba_kind_mismatch st) 
     in
     let unsigned = b.scalar_type = `UInt32 in
@@ -312,9 +312,10 @@ module Prim = struct
     | None -> if count = None then invalid_arg err_prim_underspec else ()
     | Some b -> 
         begin match Buf.scalar_type b with 
-        | `UInt8 | `UInt16 | `UInt32 -> ()
-        | `Int8 | `Int16 | `Int32 | `Float32 | `Float64 as st -> 
-            invalid_arg (err_prim_not_uint (Buf.scalar_type_to_string st))
+        | `UInt8 | `UInt16 | `UInt32 | `UInt64 (* TODO possible ? *) -> ()
+        | `Int8 | `Int16 | `Int32 | `Int64
+        | `Float16 | `Float32 | `Float64 as st -> 
+            invalid_arg (err_prim_not_uint (str "%a" Buf.pp_scalar_type st))
         end
     end;
     let add_attr acc a = 

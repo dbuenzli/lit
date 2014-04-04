@@ -34,8 +34,9 @@ module Buf : sig
   (** {1 Scalar types} *) 
 
   type scalar_type = 
-    [ `UInt8 | `Int8 | `UInt16 | `Int16 | `UInt32 | `Int32 
-    | `Float32 | `Float64 ] 
+    [ `Int8 | `Int16 | `Int32 | `Int64
+    | `UInt8 | `UInt16 | `UInt32 | `UInt64
+    | `Float16 | `Float32 | `Float64 ] 
   (** The type for scalar types. *) 
 
   val scalar_type_byte_count : scalar_type -> int
@@ -47,10 +48,6 @@ module Buf : sig
       [unsigned] is only used for indicating wheter {!Bigarray.int32} 
       should be mapped to [`UInt32] rather than [`Int32] 
       (defaults to [false]). *)
-
-  val scalar_type_to_string : scalar_type -> string 
-  (** [scalar_type_to_string st] is an unspecified textual representation
-      of [st]. *) 
   
   val pp_scalar_type : Format.formatter -> scalar_type -> unit
   (** [pp_scalar_type ppf st] prints and unspecified representation 
