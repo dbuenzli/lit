@@ -385,32 +385,35 @@ module Tex = struct
     | `Nearest | `Nearest_mipmap_linear | `Nearest_mipmap_nearest ]
 
   type kind = [ `D1 | `D2 | `D3 | `Buffer ]
-  type format = 
-    [ `R_UInt8 | `R_Int8 | `R_UInt8_norm | `R_Int8_norm 
-    | `R_UInt16 | `R_Int16 | `R_UInt16_norm | `R_Int16_norm | `R_Float32
-    | `RG_UInt8 | `RG_Int8 | `RG_UInt8_norm | `RG_Int8_norm 
-    | `RG_UInt16 | `RG_Int16 | `RG_UInt16_norm | `RG_Int16_norm |`RG_Float32
-    | `RGB_UInt8 | `RGB_Int8 | `RGB_UInt8_norm | `RGB_Int8_norm 
-    | `RGB_UInt16 | `RGB_Int16 | `RGB_UInt16_norm | `RGB_Int16_norm  
-    | `RGB_Float32
-    | `RGBA_UInt8 | `RGBA_Int8 | `RGBA_UInt8_norm | `RGBA_Int8_norm 
-    | `RGBA_UInt16 | `RGBA_Int16 | `RGBA_UInt16_norm | `RGBA_Int16_norm 
-    | `RGBA_Float32
-    | `SRGB_UInt8_norm 
-    | `SRGBA_UInt8_norm
-    | `D_UInt16 | `D_UInt24 | `D_Float32 
-    | `D_UInt24_S_UInt8 | `D_Float32_S_UInt8 
-    | `S_UInt8 ]
 
-  type init = [ 
-    | `D1 of float * Buf.t option
-    | `D2 of size2 * Buf.t option
-    | `D3 of size3 * Buf.t option
-    | `Buffer of Buf.t ]
-               
+  type scalar_type = 
+    [ `Int8 | `Int16 | `Int32 | `Int64
+    | `UInt8 | `UInt16 | `UInt32 | `UInt64
+    | `Float16 | `Float32 | `Float64 ]
+
+  type sample_format = 
+    [ `D1 of scalar_type * bool 
+    | `D2 of scalar_type * bool 
+    | `D3 of scalar_type * bool 
+    | `D4 of scalar_type * bool
+    | `SRGB of [ `UInt8 ]
+    | `SRGBA of [ `UInt8 ]
+    | `Depth of [ `UInt16 | `UInt24 | `Float32 ]
+    | `Stencil of [ `UInt8 ]
+    | `Depth_stencil of [ `UInt24_UInt8 | `Float32_UInt8 ] ]
+
+  type init =
+    [ `D1 of sample_format * float * Buf.t option
+    | `D2 of sample_format * size2 * Buf.t option
+    | `D3 of sample_format * size3 * Buf.t option
+    | `Buffer of sample_format * Buf.t ]
+
+  let init_of_raster ?(no_buf = false) ?sample_format ?(norm = true) r = 
+    failwith "TODO"
+
   type t = 
     { kind : kind; 
-      format : format; 
+      sample_format : sample_format; 
       mutable size : size3;
       mutable buf : Buf.t option;
       mutable buf_autorelease : bool;
@@ -425,7 +428,7 @@ module Tex = struct
     
   let nil = 
     { kind = `D1; 
-      format = `R_UInt8; 
+      sample_format = `D1 (`UInt8, true); 
       size = Size3.zero;
       buf = None; 
       buf_autorelease = true; 
@@ -440,26 +443,26 @@ module Tex = struct
 
   let create ?(wrap_s = `Repeat) ?(wrap_t = `Repeat) ?(wrap_r = `Repeat) 
       ?(mipmaps = false) ?(min_filter = `Nearest_mipmap_linear) 
-      ?(mag_filter = `Nearest) ?buf_autorelease ~format init = 
+      ?(mag_filter = `Nearest) ?buf_autorelease init = 
     (* TODO buffer length checks *) 
-    let kind, size, buf, default_buf_autorelease = match init with 
-    | `D1 (s, b) -> `D1, Size3.v s 1. 1., b, true 
-    | `D2 (s, b) -> `D2, Size3.v (Size2.w s) (Size2.h s) 1., b, true 
-    | `D3 (s, b) -> `D3, s, b, true
-    | `Buffer b -> `Buffer, Size3.zero, Some b, false
+    let sformat, kind, size, buf, default_buf_autorelease = match init with 
+    | `D1 (fmt, s, b) -> fmt, `D1, Size3.v s 1. 1., b, true 
+    | `D2 (fmt, s, b) -> fmt, `D2, Size3.v (Size2.w s) (Size2.h s) 1., b, true 
+    | `D3 (fmt, s, b) -> fmt, `D3, s, b, true
+    | `Buffer (fmt, b) -> fmt, `Buffer, Size3.zero, Some b, false
     in
     let buf_autorelease = match buf_autorelease with 
     | None -> default_buf_autorelease
     | Some b -> b
     in
-    { kind; format; size; 
+    { kind; sample_format = sformat; size; 
       buf; buf_autorelease;
       gpu_update = true;
       wrap_s; wrap_t; wrap_r;
       mipmaps; min_filter; mag_filter;
       info = Info.none; }
   
-  let format t = t.format
+  let sample_format t = t.sample_format
   let kind t = t.kind
   let size2 t = V2.of_v3 t.size
   let size3 t = t.size

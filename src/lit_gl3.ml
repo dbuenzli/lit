@@ -337,90 +337,91 @@ module Tex = struct
   | `Mirrored_repeat -> Gl.mirrored_repeat
   | `Repeat -> Gl.repeat
 
-  let internal_format_enum_of_format : Lit.Tex.format -> Gl.enum = function 
-  | `RGBA_Float32 -> Gl.rgba32f
-  | `RGBA_Int16 -> Gl.rgba16i
-  | `RGBA_Int16_norm -> Gl.rgba16_snorm
-  | `RGBA_UInt16 -> Gl.rgba16ui
-  | `RGBA_UInt16_norm -> Gl.rgba16
-  | `RGBA_Int8 -> Gl.rgba8i
-  | `RGBA_Int8_norm -> Gl.rgba8_snorm
-  | `RGBA_UInt8 -> Gl.rgba8ui
-  | `RGBA_UInt8_norm -> Gl.rgba8
-  | `RGB_Float32 -> Gl.rgb32f
-  | `RGB_Int16 -> Gl.rgb16i
-  | `RGB_Int16_norm -> Gl.rgb16_snorm
-  | `RGB_UInt16 -> Gl.rgb16ui
-  | `RGB_UInt16_norm -> Gl.rgb16
-  | `RGB_Int8 -> Gl.rgb8i
-  | `RGB_Int8_norm -> Gl.rgb8_snorm
-  | `RGB_UInt8 -> Gl.rgb8ui
-  | `RGB_UInt8_norm -> Gl.rgb8
-  | `RG_Float32 -> Gl.rg32f
-  | `RG_Int16 -> Gl.rg16i
-  | `RG_Int16_norm -> Gl.rg16_snorm
-  | `RG_UInt16 -> Gl.rg16ui
-  | `RG_UInt16_norm -> Gl.rg16
-  | `RG_Int8 -> Gl.rg8i
-  | `RG_Int8_norm -> Gl.rg8_snorm
-  | `RG_UInt8 -> Gl.rg8ui
-  | `RG_UInt8_norm -> Gl.rg8
-  | `R_Float32 -> Gl.r32f
-  | `R_Int16 -> Gl.r16i
-  | `R_Int16_norm -> Gl.r16_snorm
-  | `R_UInt16 -> Gl.r16ui
-  | `R_UInt16_norm -> Gl.r16
-  | `R_Int8 -> Gl.r8i
-  | `R_Int8_norm -> Gl.r8_snorm
-  | `R_UInt8 -> Gl.r8ui
-  | `R_UInt8_norm -> Gl.r8
-  | `SRGBA_UInt8_norm -> Gl.srgb8_alpha8
-  | `SRGB_UInt8_norm -> Gl.srgb8
-  | `D_UInt16 -> Gl.depth_component16
-  | `D_UInt24 -> Gl.depth_component24
-  | `D_Float32 -> Gl.depth_component32f
-  | `D_UInt24_S_UInt8 -> Gl.depth24_stencil8 
-  | `D_Float32_S_UInt8 -> Gl.depth32f_stencil8
-  | `S_UInt8 -> Gl.stencil_index8
+  let internal_format_enum_of_format : Lit.Tex.sample_format -> Gl.enum = 
+    function 
+    | `D4 fmt -> 
+        begin match fmt with 
+        | `Float32, _ -> Gl.rgba32f
+        | `Int8, norm -> if norm then Gl.rgba8_snorm else Gl.rgba8i
+        | `Int16, norm -> if norm then Gl.rgba16_snorm else Gl.rgba16i
+        | `UInt8, norm ->  if norm then Gl.rgba8 else Gl.rgba8ui
+        | `UInt16, norm -> if norm then Gl.rgba16 else Gl.rgba16ui
+        | _ -> failwith "TODO"
+        end                                
+    | `D3 fmt -> 
+        begin match fmt with 
+        | `Float32, _ -> Gl.rgb32f
+        | `Int8, norm -> if norm then Gl.rgb8_snorm else Gl.rgb8i
+        | `Int16, norm -> if norm then Gl.rgb16_snorm else Gl.rgb16i
+        | `UInt8, norm -> if norm then Gl.rgb8 else Gl.rgb8ui
+        | `UInt16, norm -> if norm then Gl.rgb16 else Gl.rgb16ui
+        | _ -> failwith "TODO"
+        end
+    | `D2 fmt -> 
+        begin match fmt with 
+        | `Float32, _ -> Gl.rg32f
+        | `Int8, norm -> if norm then Gl.rg8_snorm else Gl.rg8i
+        | `Int16, norm -> if norm then Gl.rg16_snorm else Gl.rg16i
+        | `UInt8, norm -> if norm then Gl.rg8 else Gl.rg8ui
+        | `UInt16, norm -> if norm then Gl.rg16 else Gl.rg16ui
+        | _ -> failwith "TODO"
+        end
+    | `D1 fmt -> 
+        begin match fmt with
+        | `Float32, _ -> Gl.r32f
+        | `Int8, norm -> if norm then Gl.r8_snorm else Gl.r8i
+        | `Int16, norm -> if norm then Gl.r16_snorm else Gl.r16i
+        | `UInt8, norm -> if norm then Gl.r8 else Gl.r8ui
+        | `UInt16, norm -> if norm then Gl.r16 else Gl.r16ui
+        | _ -> failwith "TODO"
+        end
+    | `SRGB `UInt8 -> Gl.srgb8
+    | `SRGBA `UInt8 -> Gl.srgb8_alpha8
+    | `Depth fmt -> 
+        begin match fmt with 
+        | `UInt16 -> Gl.depth_component16
+        | `UInt24 -> Gl.depth_component24
+        | `Float32 -> Gl.depth_component32f
+        end
+    | `Depth_stencil fmt -> 
+        begin match fmt with 
+        | `UInt24_UInt8 -> Gl.depth24_stencil8 
+        | `Float32_UInt8 -> Gl.depth32f_stencil8
+        end
+    | `Stencil `UInt8 -> Gl.stencil_index8
 
-  let format_enum_of_format : Lit.Tex.format -> Gl.enum = function 
-  | `R_Float32 | `R_Int8_norm | `R_UInt8_norm 
-  | `R_Int16_norm | `R_UInt16_norm -> Gl.red
-  | `R_Int8 | `R_UInt8 | `R_Int16 | `R_UInt16 -> Gl.red_integer
-  | `RG_Float32 | `RG_Int8_norm | `RG_UInt8_norm 
-  | `RG_Int16_norm | `RG_UInt16_norm -> Gl.rg
-  | `RG_Int8 | `RG_UInt8 | `RG_Int16 | `RG_UInt16 -> Gl.rg_integer
-  | `RGB_Float32 | `RGB_Int8_norm | `RGB_UInt8_norm 
-  | `RGB_Int16_norm | `RGB_UInt16_norm 
-  | `SRGB_UInt8_norm -> Gl.rgb
-  | `RGB_Int8 | `RGB_UInt8 | `RGB_Int16 | `RGB_UInt16 -> Gl.rgb_integer
-  | `RGBA_Float32 | `RGBA_Int8_norm | `RGBA_UInt8_norm 
-  | `RGBA_Int16_norm | `RGBA_UInt16_norm | `SRGBA_UInt8_norm ->
-      Gl.rgba
-  | `RGBA_Int8 | `RGBA_UInt8 | `RGBA_Int16 | `RGBA_UInt16  -> Gl.rgba_integer
-  | `D_UInt16 | `D_UInt24 | `D_Float32 -> Gl.depth_component 
-  | `D_UInt24_S_UInt8 | `D_Float32_S_UInt8 -> Gl.depth_stencil
-  | `S_UInt8 -> Gl.stencil_index
 
-  let type_enum_of_format : Tex.format -> Gl.enum = function 
-  | `R_UInt8 | `R_UInt8_norm | `RG_UInt8 | `RG_UInt8_norm | `RGB_UInt8 
-  | `RGB_UInt8_norm | `RGBA_UInt8 | `RGBA_UInt8_norm | `SRGB_UInt8_norm 
-  | `SRGBA_UInt8_norm | `S_UInt8 -> 
-      Gl.unsigned_byte
-  | `R_Int8  | `R_Int8_norm | `RG_Int8 | `RG_Int8_norm | `RGB_Int8 
-  | `RGB_Int8_norm | `RGBA_Int8 | `RGBA_Int8_norm -> 
+  type int_scalar_type = [ `Int8 | `Int16 | `Int32 | `Int64 
+                         | `UInt8 | `UInt16 | `UInt32 | `UInt64 ]
+
+  let format_enum_of_format : Lit.Tex.sample_format -> Gl.enum = function 
+  | `D1 (#int_scalar_type, false) -> Gl.red_integer 
+  | `D1 (_, _) -> Gl.red 
+  | `D2 (#int_scalar_type, false) -> Gl.rg_integer
+  | `D2 (_, _) -> Gl.rg
+  | `D3 (#int_scalar_type, false) -> Gl.rgb_integer
+  | `D3 (_, _) | `SRGB _ -> Gl.rgb
+  | `D4 (#int_scalar_type, false) -> Gl.rgba_integer
+  | `D4 (_, _) | `SRGBA _ -> Gl.rgba
+  | `Depth _ -> Gl.depth_component 
+  | `Depth_stencil _ -> Gl.depth_stencil
+  | `Stencil _ -> Gl.stencil_index
+
+  let type_enum_of_format : Tex.sample_format -> Gl.enum = function 
+  | `D1 (`Int8, _) | `D2 (`Int8, _) | `D3 (`Int8, _) | `D4 (`Int8, _) ->
       Gl.byte
-  | `R_UInt16 | `R_UInt16_norm | `RG_UInt16 | `RG_UInt16_norm | `RGB_UInt16 
-  | `RGB_UInt16_norm | `RGBA_UInt16 | `RGBA_UInt16_norm | `D_UInt16 -> 
-      Gl.unsigned_short
-  | `R_Int16 | `R_Int16_norm | `RG_Int16 | `RG_Int16_norm | `RGB_Int16 
-  | `RGB_Int16_norm | `RGBA_Int16 | `RGBA_Int16_norm -> 
+  | `D1 (`UInt8, _) | `D2 (`UInt8, _) | `D3 (`UInt8, _) | `D4 (`UInt8, _)
+  | `SRGB (`UInt8) | `SRGBA (`UInt8) | `Stencil (`UInt8) -> 
+      Gl.unsigned_byte          
+  | `D1 (`Int16, _) | `D2 (`Int16, _) | `D3 (`Int16, _) | `D4 (`Int16, _) ->
       Gl.short
-  | `R_Float32 | `RG_Float32 | `RGB_Float32 | `RGBA_Float32 | `D_Float32 ->
-      Gl.float
-  | `D_UInt24 | `D_UInt24_S_UInt8 | `D_Float32_S_UInt8 -> 
-     (* TODO, nothing ? *) 
-      Gl.byte
+  | `D1 (`UInt16, _) | `D2 (`UInt16, _) | `D3 (`UInt16, _) | `D4 (`UInt16, _)
+  | `Depth (`UInt16) -> 
+      Gl.unsigned_short
+  | `D1 (`Float32, _) | `D2 (`Float32, _) | `D3 (`Float32, _) 
+  | `D4 (`Float32, _) | `Depth (`Float32) ->
+    Gl.float
+  | _ -> (* TODO *) failwith "TODO"
 
   type info = { id : Id.t;  }
   let inject, project = Info.create () 
@@ -453,7 +454,7 @@ module Tex = struct
     in
     let kind = Tex.kind t in
     let target = target_enum_of_kind kind in
-    let tex_format = Tex.format t in
+    let tex_format = Tex.sample_format t in
     let internal = internal_format_enum_of_format tex_format in 
     let format = format_enum_of_format tex_format in 
     let type_ = type_enum_of_format tex_format in

@@ -23,10 +23,11 @@ let checkboard_tex () =
     done; 
     Buf.create (`Bigarray img)
   in
+  let sample_format = `D3 (`UInt8, true) in
   Tex.create 
     ~wrap_s:`Clamp_to_edge ~wrap_t:`Clamp_to_edge 
     ~mipmaps:true ~min_filter:`Linear_mipmap_linear ~mag_filter:`Linear
-    ~format:`RGB_UInt8_norm (`D2 (Size2.v 64. 64., Some img))
+    (`D2 (sample_format, Size2.v 64. 64., Some img))
 
 let program = 
   let checkboard = Uniform.tex "checkboard" (checkboard_tex ()) in

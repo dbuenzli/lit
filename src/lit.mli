@@ -416,37 +416,53 @@ module Tex : sig
   type kind = [ `D1 | `D2 | `D3 | `Buffer ]
   (** The type for kinds of textures. TODO add `Cube_map *) 
     
-  type format = 
-    [ `R_UInt8 | `R_Int8 | `R_UInt8_norm | `R_Int8_norm 
-    | `R_UInt16 | `R_Int16 | `R_UInt16_norm | `R_Int16_norm | `R_Float32
-    | `RG_UInt8 | `RG_Int8 | `RG_UInt8_norm | `RG_Int8_norm 
-    | `RG_UInt16 | `RG_Int16 | `RG_UInt16_norm | `RG_Int16_norm |`RG_Float32
-    | `RGB_UInt8 | `RGB_Int8 | `RGB_UInt8_norm | `RGB_Int8_norm 
-    | `RGB_UInt16 | `RGB_Int16 | `RGB_UInt16_norm | `RGB_Int16_norm  
-    | `RGB_Float32
-    | `RGBA_UInt8 | `RGBA_Int8 | `RGBA_UInt8_norm | `RGBA_Int8_norm 
-    | `RGBA_UInt16 | `RGBA_Int16 | `RGBA_UInt16_norm | `RGBA_Int16_norm 
-    | `RGBA_Float32
-    | `SRGB_UInt8_norm 
-    | `SRGBA_UInt8_norm 
-    | `D_UInt16 | `D_UInt24 | `D_Float32 
-    | `D_UInt24_S_UInt8 | `D_Float32_S_UInt8 
-    | `S_UInt8  ]
-  (** The type for texture formats. This defines both the internal 
-      texture format and the data given through {!init}. *) 
+  type scalar_type = 
+    [ `Int8 | `Int16 | `Int32 | `Int64
+    | `UInt8 | `UInt16 | `UInt32 | `UInt64
+    | `Float16 | `Float32 | `Float64 ]
+  (** The type for scalar types. *) 
 
-  type init = [ 
-    | `D1 of float * Buf.t option
-    | `D2 of size2 * Buf.t option
-    | `D3 of size3 * Buf.t option
-    | `Buffer of Buf.t ]
+  type sample_format = 
+    [ `D1 of scalar_type * bool 
+    | `D2 of scalar_type * bool 
+    | `D3 of scalar_type * bool 
+    | `D4 of scalar_type * bool
+    | `SRGB of [ `UInt8 ]
+    | `SRGBA of [ `UInt8 ]
+    | `Depth of [ `UInt16 | `UInt24 | `Float32 ]
+    | `Stencil of [ `UInt8 ]
+    | `Depth_stencil of [ `UInt24_UInt8 | `Float32_UInt8 ] ]
+  (** The type for texture sample formats. This defines 
+      the internal texture format and how {!init} buffers are 
+      read (dimension). For [`D1] to [`D4] the boolean indicates 
+      if normalization should be performed for signed and unsigned integers
+      scalar types.
+
+      {b Note.} Renderers may not support all sample formats.
+      This can by testing membership in {!Renderer.Tex.sample_formats}. *)
+
+  type init =
+    [ `D1 of sample_format * float * Buf.t option
+    | `D2 of sample_format * size2 * Buf.t option
+    | `D3 of sample_format * size3 * Buf.t option
+    | `Buffer of sample_format * Buf.t ]
   (** The type for texture initialisation, determines the kind 
-      of the the texture. TODO hook Gg.Raster in. 
+      of the the texture.
 
       Buffers image data pixel by pixel in row order then 
       layer order, the first pixel of the buffer is the image's 
-      lower left frontmost pixel. *) 
+      lower left frontmost pixel. 
+
+      Raster, automatically allocates a buffer the data. *) 
                
+  val init_of_raster : ?no_buf:bool -> ?sample_format:sample_format -> 
+    ?norm:bool -> raster -> init 
+  (** [init_of_raster] is an [init] value derived from [raster]. This 
+      creates a buffer value (unless [no_buf] is [false]) with the 
+      raster's data and automatically selects a sample format (unless 
+      [sample_format] is provided). [norm] is used to specify the sample 
+      format normalization (see {!sample_format}), it defaults to [true]. *)
+      
   type t = tex
   (** The type for textures. *) 
 
@@ -455,8 +471,8 @@ module Tex : sig
       texture uniforms. Trying to render the nil texture results in an error. *)
 
   val create : ?wrap_s:wrap -> ?wrap_t:wrap -> ?wrap_r:wrap -> 
-    ?mipmaps:bool ->  ?min_filter:min_filter -> ?mag_filter:mag_filter -> 
-    ?buf_autorelease:bool -> format:format -> init -> tex
+    ?mipmaps:bool -> ?min_filter:min_filter -> ?mag_filter:mag_filter -> 
+    ?buf_autorelease:bool -> init -> tex
     (** {ul
         {- [wrap_s, wrap_t, wrap_r], wrapping behaviour, if applicable, 
            along [s], [t] and [r] dimensions. Defaults to `Repeat.}
@@ -467,15 +483,28 @@ module Tex : sig
            [`Nearest].} 
         {- [buf_autorelease], doesn't keep a reference on buf once
            texture has been uploaded to gpu. Defaults to [true] for 
-           `D1 to `D3 but false on `Buffer.}
-        {- [format], the internal format.}} *) 
+           `D1 to `D3 but false on `Buffer.}} 
 
-  val format : tex -> format 
+        @raise Invalid_argumnet if the [init] spec is inconsistent. *) 
+
+  val sample_format : tex -> sample_format 
+  (** [sample_format t] is [t]'s sample format. *) 
+
   val kind : tex -> kind 
+  (** [kind t] is [t]'s texture kind. *) 
+
   val size2 : tex -> size2 
+  (** [size2 t] is [t]'s width and height. *) 
+
   val size3 : tex -> size3 
+  (** [size3 t] is [t]'s width and height in samples. *) 
+
   val buf : tex -> Buf.t option
+  (** [buf] is [t]'s buffer if any. *) 
+
   val set_buf : tex -> Buf.t option -> unit
+  (** [set_buf t b] sets [t]'s buffer to b. *) 
+
   val buf_autorelease : tex -> bool 
   val set_buf_autorelease : tex -> bool -> unit
   val gpu_update : tex -> bool 
@@ -488,8 +517,8 @@ module Tex : sig
   val mipmaps : tex -> bool
   val min_filter : tex -> min_filter 
   val mag_filter : tex -> mag_filter 
-
   val pp : Format.formatter -> tex -> unit
+
 end
 
 (** Uniforms. *) 

@@ -15,6 +15,7 @@
 * Support for explicit resource allocate/disposal in the 
   Renderer.{Buf,Prog,Tex} modules. For now it's allocate on usage and 
   and dispose in Gc.finalizer.
+* Tex format
 * Multipass (or not) 
 * Transform feedback 
 * Renderer.Caps.
@@ -28,3 +29,5 @@
   (* For debugging *) 
 * Review pretty printers. 
 * glEnable (GL_MULTISAMPLE_ARB)
+
+* Review sample_format to gl types. 
