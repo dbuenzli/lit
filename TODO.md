@@ -2,6 +2,7 @@
 * `Uniform.viewport_{o,size}` should we still have them in 
   normalized surface coordinate and have a seperate `surface_size`
   builtin ? 
+* Redo uniform handling, also Effect has ~uniforms and Prog ~uset  
 * Use Lequal as default depth test.
 * s/shader_kind/shader_stage
 * Add depth_range to View.

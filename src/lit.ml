@@ -448,34 +448,41 @@ module Tex = struct
       pp ppf "@[<1>(tex-init Buffer %a %a)@]" 
         pp_sample_format sf Buf.pp buf 
 
-  let init_of_raster ?(buf = true) ?cpu_autorelease ?usage ?sample_format 
-      ?(norm = true) r 
-    = 
-    let sample_format = match sample_format with 
-    | Some sf -> sf 
+  let init_sample_format_of_raster r norm = function
+  | Some sf -> sf
+  | None ->
+      let rsf = Raster.sample_format r in
+      let st = Raster.Sample.scalar_type rsf in
+      let dim = match Raster.Sample.pack rsf with 
+      | None -> Raster.Sample.dim rsf
+      | Some _ -> 1 
+      in
+      begin match dim with 
+      | 1 -> `D1 (st, norm) | 2 -> `D2 (st, norm) 
+      | 3 -> `D3 (st, norm) | 4 -> `D4 (st, norm) 
+      | d -> invalid_arg (err_raster_sf_dim d)
+      end
+
+  let init_of_raster ?(buf = true) ?cpu_autorelease ?usage ?kind ?sample_format
+      ?(norm = true) r =
+    let sample_format = init_sample_format_of_raster r norm sample_format in
+    let kind = match kind with 
+    | Some k -> k
     | None -> 
-        let rsf = Raster.sample_format r in
-        let st = Raster.Sample.scalar_type rsf in
-        let dim = match Raster.Sample.pack rsf with 
-        | None -> Raster.Sample.dim rsf
-        | Some _ -> 1 
-        in
-        begin match dim with 
-        | 1 -> `D1 (st, norm) 
-        | 2 -> `D2 (st, norm) 
-        | 3 -> `D3 (st, norm) 
-        | 4 -> `D4 (st, norm) 
-        | d -> invalid_arg (err_raster_sf_dim d)
-        end
+        if Raster.d r > 1 then `D3 else 
+        if Raster.h r > 1 then `D2 else `D1
     in
     let buf = 
-      if buf 
-      then Some (Buf.create ?cpu_autorelease ?usage (Raster.buffer r)) 
-      else None
+      if not buf || kind = `Buffer then None else
+      Some (Buf.create ?cpu_autorelease ?usage (Raster.buffer r))
     in
-    if Raster.d r > 1 then `D3 (sample_format, Raster.size3 r, buf) else 
-    if Raster.h r > 1 then `D2 (sample_format, Raster.size2 r, buf) else 
-    `D1 (sample_format, float (Raster.w r), buf)
+    match kind with 
+    | `D1 -> `D1 (sample_format, float (Raster.w r), buf)
+    | `D2 -> `D2 (sample_format, (Raster.size2 r), buf)
+    | `D3 -> `D3 (sample_format, (Raster.size3 r), buf)
+    | `Buffer -> 
+        let buf = match buf with Some buf -> buf | None -> assert false in
+        `Buffer (sample_format, buf)
 
   type t = 
     { kind : kind; 
