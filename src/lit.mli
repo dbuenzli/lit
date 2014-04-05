@@ -839,18 +839,19 @@ module Effect : sig
 
   type t = effect
   
-  val create : ?raster:raster -> ?depth:depth -> prog -> effect   
-  (** [create raster depth prog] is an effect that uses the GPU program 
-      [prog]. [raster] defines the rasterization setup (defaults to 
+  val create : ?raster:raster -> ?depth:depth -> ?uniforms:Uniform.set -> 
+    prog -> effect   
+  (** [create raster depth uniforms prog] is an effect that uses the GPU 
+      program [prog]. [raster] defines the rasterization setup (defaults to 
       {!default_raster}) and depth the depth buffer setup (defaults to 
-      {!default_depth}). *) 
+      {!default_depth}). [uniforms] is the uniforms used with [prog]
+      (defaults to [Prog.uniforms (prog e)]). *) 
     
   val prog : effect -> prog
   (** [prog e] is [e]'s GPU program. *) 
 
   val uniforms : effect -> Uniform.set 
-  (** [uniforms e] the uniforms that are used with [e]'s program (initially
-      equal to [Prog.uniforms (prog e)]. *) 
+  (** [uniforms e] the uniforms that are used with [e]'s program. *) 
 
   val get_uniform : effect -> 'a uniform -> Uniform.value_untyped 
   (** [get_uniform e u] is the value of uniform [u] in [e]. *) 

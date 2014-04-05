@@ -1005,8 +1005,12 @@ module Effect = struct
       mutable uniforms : Uniform.set; 
       mutable info : Info.t; } 
 
-  let create ?(raster = default_raster) ?(depth = default_depth) prog =
-    let uniforms = Prog.uniforms prog in 
+  let create ?(raster = default_raster) ?(depth = default_depth) ?uniforms
+      prog =
+    let uniforms = match uniforms with 
+    | None -> Prog.uniforms prog 
+    | Some us -> us
+    in
     { raster; depth; prog; uniforms; info = Info.none }
            
   let prog e = e.prog
