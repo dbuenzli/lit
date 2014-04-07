@@ -127,6 +127,13 @@ module Buf : sig
       @raise Invalid_argument if scalar type [st] is not the 
       scalar type of [b]. *)
 
+  val get_cpu : buf -> ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
+  (** [get_cpu b st] is [cpu b st] but raises if there's no 
+      cpu buffer.
+
+      @raise Invalid_argument if [cpu b st] raises or if 
+      [cpu_exists b] is [false]. *) 
+
   val set_cpu : buf -> ('a, 'b) bigarray option -> unit
   (** [set_cpu b ba] sets the CPU buffer of [b] to [ba]. 
 

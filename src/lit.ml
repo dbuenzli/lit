@@ -166,6 +166,10 @@ module Buf = struct
         (* FIXME can we do something here ? *) 
         (Obj.magic (Some ba) : (a, b) bigarray option)
 
+  let get_cpu b st = match cpu b st with 
+  | None -> invalid_arg err_no_cpu_buffer
+  | Some cpu -> cpu 
+
   let cpu_p b = b.cpu
 
   let check_kind b k =
