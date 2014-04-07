@@ -43,7 +43,7 @@ let program =
 
 let effect = Effect.create program 
 
-let op = Lit.op effect (triangle ())
+let op = Renderer.op effect (triangle ())
 
 (* Render *) 
 

@@ -74,7 +74,7 @@ let program =
   ]
 
 let effect = Effect.create program 
-let op = Lit.op effect (fullscreen ())
+let op = Renderer.op effect (fullscreen ())
 
 (* Render *) 
          

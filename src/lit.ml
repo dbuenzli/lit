@@ -1042,9 +1042,6 @@ end
 type op = { count : int; effect : Effect.t; uniforms : Uniform.set; 
             tr : m4; prim : Prim.t }
 
-let op ?(count = 1) ?(uniforms = Uniform.empty) ?(tr = M4.id) effect prim = 
-  { count; effect; uniforms; tr; prim }
-
 module Renderer = struct
 
   module Log = struct
@@ -1206,6 +1203,10 @@ module Renderer = struct
       val unmap : t -> Buf.t -> unit
     end
   end 
+
+  let op ?(count = 1) ?(uniforms = Uniform.empty) ?(tr = M4.id) effect prim = 
+    { count; effect; uniforms; tr; prim }
+
 
   type t = R : (module T with type t = 'a) * 'a -> t
     

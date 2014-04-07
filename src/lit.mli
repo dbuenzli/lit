@@ -1012,10 +1012,6 @@ type op =
   { count : int; effect : effect; uniforms : Uniform.set; tr : m4; prim : prim }
 (** The type for render operations. *) 
 
-val op : ?count:int -> ?uniforms:Uniform.set -> ?tr:m4 -> effect -> prim -> op
-(** [op count uniforms tr e p] is a render op. [count] defaults to 1. 
-    [uniforms] defaults to {!Uniform.empty}, [tr] to {!M4.id}. *)
-
 (** Renderers *) 
 module Renderer : sig
 
@@ -1158,6 +1154,13 @@ module Renderer : sig
         (int * string) list -> [> `Compiler of compiler_msg list ]
     end
   end
+
+  (** {1:ops Render operations} *) 
+
+  val op : ?count:int -> ?uniforms:Uniform.set -> ?tr:m4 -> effect -> prim -> op
+  (** [op count uniforms tr e p] is a render op. [count] defaults to 1. 
+      [uniforms] defaults to {!Uniform.empty}, [tr] to {!M4.id}. *)
+
 
   (** {1:renderers Renderers} *)
 

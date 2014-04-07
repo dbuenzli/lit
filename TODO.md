@@ -31,5 +31,7 @@
   (* For debugging *) 
 * Review pretty printers. 
 * glEnable (GL_MULTISAMPLE_ARB)
-
+* Update examples and litu to "new style" specify atts prim first
+  then generate the data. Makes more sense as you get to learn the
+  actual layout before reading the generating code.
 * Review sample_format to gl types. 

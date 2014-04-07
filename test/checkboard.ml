@@ -74,7 +74,7 @@ let rot = ref None
 (* Render *) 
 
 let draw r = 
-  let op = Lit.op effect ~tr:(M4.of_quat !prim_tr) prim in
+  let op = Renderer.op effect ~tr:(M4.of_quat !prim_tr) prim in
   Renderer.add_op r op;
   Renderer.render r
 
