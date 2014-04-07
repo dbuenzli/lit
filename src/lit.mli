@@ -225,6 +225,14 @@ module Attr : sig
 
   val color : string 
   (** [color] is ["color"]. *)
+
+  val tex : string 
+  (** [tex] is ["tex"]. *)
+
+  val texn : int -> string 
+  (** [texn n] is [(Printf.sprintf "tex%d" n)]
+      
+      @raise Invalid_argument if [n] is negative. *)
 end
 
 (** Primitives 

@@ -33,8 +33,8 @@ let err_raster_sf_dim d = str "raster sample format dimension > 4 (%d)" d
 let err_prim_underspec = str "one of ?index or ?count must be specified"
 let err_prim_not_uint t = str "index's scalar type not unsigned integer (%s)" t
 let err_prim_attr_dup n = str "attribute %s specified more than once" n
-
 let err_miss_uniform k = str "no uniform %s" k
+let err_neg_arg arg v = str "negative argument %s (%d)" arg v
 
 (* Renderer ids. *) 
 
@@ -236,6 +236,8 @@ module Attr = struct
   let vertex = "vertex"
   let normal = "normal" 
   let color = "color"
+  let tex = "tex" 
+  let texn n = if n < 0 then err_neg_arg "n" n else (str "tex%d" n)
 end
 
 (* Primitives *) 
