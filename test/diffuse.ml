@@ -63,7 +63,7 @@ let next_prim = Demo.prim_cycler ~normals:true ()
 let prim = ref (next_prim ()) 
 let prim_tr =
   let angle = Float.pi_div_4 in
-  ref (Quat.rot_zyx (V3.v angle angle 0.))
+  ref (Quat.rot3_zyx (V3.v angle angle 0.))
 
 let rot = ref None
 

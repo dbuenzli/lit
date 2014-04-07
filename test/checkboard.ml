@@ -67,7 +67,7 @@ let prim_tr =
   let z = -0.1 *. Float.pi in 
   let y = -0.05 *. Float.pi in
   let x =  0.05 *. Float.pi in
-  ref (Quat.rot_zyx (V3.v z y x))
+  ref (Quat.rot3_zyx (V3.v z y x))
 
 let rot = ref None
 
