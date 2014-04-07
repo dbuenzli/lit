@@ -10,19 +10,21 @@ open Gg
 open Lit
 
 let triangle () =
-  let b = Ba.create Bigarray.float32 (3 * 3 + 3 * 4) in
-  let i = Ba.set_3d b 0 (-0.8) (-0.8) ( 0.0) in  (* vertices *) 
-  let i = Ba.set_3d b i ( 0.8) (-0.8) ( 0.0) in
-  let i = Ba.set_3d b i ( 0.0) ( 0.8) ( 0.0) in
-  let i = Ba.set_v4 b i Color.red in             (* colors *) 
-  let i = Ba.set_v4 b i Color.green in
-  let _ = Ba.set_v4 b i Color.blue in
-  let b = Buf.create (`Bigarray b) in
+  let b = Buf.create (`Cpu (`Float32, 3 * 3 + 3 * 4)) in 
   let vertices = Attr.create Attr.vertex ~dim:3 b in 
   let colors = Attr.create Attr.color ~dim:4 ~first:(3 * 3) b in
-  Prim.create ~count:3 `Triangles [vertices; colors]
+  let prim = Prim.create ~count:3 `Triangles [vertices; colors] in
+  let b = Buf.get_cpu b Ba.Float32 in
+  Ba.set_3d b 0  (-0.8) (-0.8) ( 0.0);  (* vertices *) 
+  Ba.set_3d b 3  ( 0.8) (-0.8) ( 0.0);
+  Ba.set_3d b 6  ( 0.0) ( 0.8) ( 0.0);
+  Ba.set_v4 b 9  Color.red;             (* colors *) 
+  Ba.set_v4 b 13 Color.green;
+  Ba.set_v4 b 17 Color.blue;
+  prim
     
-let program = Prog.create [
+let program = 
+  Prog.create [
     Prog.shader `Vertex "
     in vec3 vertex;
     in vec4 color; 
@@ -41,19 +43,18 @@ let program = Prog.create [
 
 let effect = Effect.create program 
 
-let op = { count = 1; effect; prim = triangle () } 
+let op = Lit.op effect (triangle ())
 
 (* Render *) 
 
 let size = V2.v 600. 400.
-let r = Renderer.create ~time:App.elapsed ~size (App.select_backend ()) 
+let r = Renderer.create ~size (App.select_backend ()) 
 
 let view = View.create () 
 let draw () = 
   Renderer.set_view r view;
-  Renderer.frame_begin r; 
-  Renderer.frame_add r op;
-  Renderer.frame_end r
+  Renderer.add_op r op;
+  Renderer.render r
 
 let ev app ev = match (ev : App.ev) with 
 | `Env `Exit -> Renderer.release r; `Ok
@@ -61,8 +62,7 @@ let ev app ev = match (ev : App.ev) with
     Format.printf "@[%a@]@." Renderer.Cap.pp_gl_synopsis r; `Ok
 | `Env (`Resize size) ->
     Renderer.set_size r size; 
-    draw (); 
-    draw (); 
+    draw ();
     App.update_surface app;
     `Ok
 | `Tick _ -> assert false
