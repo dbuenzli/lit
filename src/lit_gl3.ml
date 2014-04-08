@@ -989,21 +989,60 @@ module Effect = struct
           Gl.enable Gl.polygon_offset_fill; 
           Gl.polygon_offset factor units
         end
+
+  let enum_of_blend_mul = function 
+  | `Zero -> Gl.zero
+  | `One -> Gl.one
+  | `Src -> Gl.src_color
+  | `One_minus_src -> Gl.one_minus_src_color 
+  | `Src_a -> Gl.src_alpha
+  | `One_minus_src_a -> Gl.one_minus_src_alpha
+  | `Src_a_saturate -> Gl.src_alpha_saturate
+  | `Src1 -> Gl.src1_color 
+  | `One_minus_src1 -> Gl.one_minus_src1_color 
+  | `Src1_a -> Gl.src1_alpha
+  | `One_minus_src1_a -> Gl.one_minus_src1_alpha
+  | `Dst -> Gl.dst_color 
+  | `One_minus_dst -> Gl.one_minus_dst_color 
+  | `Dst_a -> Gl.dst_alpha 
+  | `One_minus_dst_a -> Gl.one_minus_dst_alpha 
+  | `Cst -> Gl.constant_color 
+  | `One_minus_cst -> Gl.one_minus_constant_color
+  | `Cst_a  -> Gl.constant_alpha
+  | `One_minus_cst_a -> Gl.one_minus_constant_alpha
+
+  let enums_of_blend_eq = function 
+  | `Add (a, b) -> 
+      Gl.func_add, enum_of_blend_mul a, enum_of_blend_mul b 
+  | `Sub (a, b) -> 
+      Gl.func_subtract, enum_of_blend_mul a, enum_of_blend_mul b
+  | `Rev_sub (a, b) -> 
+      Gl.func_reverse_subtract, enum_of_blend_mul a, enum_of_blend_mul b
+  | `Min -> 
+      Gl.min, Gl.one (* irrelevant *), Gl.one (* irrelevant *) 
+  | `Max -> 
+      Gl.max, Gl.one (* irrelevant *), Gl.one (* irrelevant *)
+
+  let set_blend_state r e = 
+    let b = blend e in 
+    if not b.blend then Gl.disable Gl.blend else
+    begin 
+      Gl.enable Gl.blend;
+      let eq_rgb, a_rgb, b_rgb = enums_of_blend_eq b.blend_rgb in 
+      let eq_a, a_a, b_a = enums_of_blend_eq b.blend_a in
+      let cst = b.blend_cst in
+      Gl.blend_equation_separate eq_rgb eq_a;
+      Gl.blend_func_separate a_rgb b_rgb a_a b_a;
+      Color.(Gl.blend_color (r cst) (g cst) (b cst) (a cst))
+    end
 end
 
 let init_gl_state r = 
   Gl.enable Gl.scissor_test;
-  (* Raster *)
-  Gl.disable Gl.cull_face_enum;
-  (* Depth *)
-  Gl.disable Gl.depth_test;
-  Gl.disable Gl.polygon_offset_fill;
-  Gl.depth_func Gl.less;
-  Gl.depth_mask true;
-  (* TODO move that to blend state ? *) 
   Gl.enable Gl.blend;
   Gl.blend_equation Gl.func_add; 
-  Gl.blend_func Gl.src_alpha Gl.one_minus_src_alpha
+  Gl.blend_func Gl.src_alpha Gl.one_minus_src_alpha;
+  ()
 
 let init_framebuffer r clear =
   let viewport = View.viewport r.view in
@@ -1044,6 +1083,7 @@ let render_op r prog_info op =
   Prog.bind_uniforms r prog_info op;
   Effect.set_raster_state r op.effect; 
   Effect.set_depth_state r op.effect; 
+  Effect.set_blend_state r op.effect; 
   match Prim.index op.prim with
   | None -> 
       let prim_info = Prim.get_info op.prim in

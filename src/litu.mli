@@ -140,9 +140,11 @@ module Effect : sig
     (** [wire_only], if [true] only the wireframe is shown, defaults to 
         [false]. *) 
     
-    val create : ?raster:Effect.raster -> ?depth:Effect.depth -> 
-      ?fill_color:Color.t -> ?wire_color:Color.t -> 
-      ?wire_width:float -> ?wire_only:bool -> unit -> Effect.t
+    val create : 
+      ?raster:Effect.raster -> ?depth:Effect.depth -> ?blend:Effect.blend ->
+      ?fill_color:Color.t -> 
+      ?wire_color:Color.t -> ?wire_width:float -> ?wire_only:bool -> unit -> 
+      Effect.t
     (** [create ()] is a new wireframe effect, the optional parameters
         can be used to preset the uniforms. *)
   end

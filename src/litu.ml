@@ -400,9 +400,10 @@ module Effect = struct
           }
         }" ]
           
-    let create ?raster ?depth ?fill_color ?wire_color ?wire_width 
+    let create ?raster ?depth ?blend ?fill_color ?wire_color ?wire_width 
         ?wire_only () = 
-      let effect = Effect.create ?raster ?depth program in
+      let blend = match blend with None -> Effect.blend_alpha | Some b -> b in
+      let effect = Effect.create ?raster ?depth ~blend program in
       let set k v = match v with
       | None -> () | Some v -> Effect.set_uniform effect k v
       in

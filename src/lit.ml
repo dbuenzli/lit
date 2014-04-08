@@ -1000,31 +1000,73 @@ module Effect = struct
   (* Depth state *) 
 
   type depth_test = 
-    [ `Never | `Less | `Equal | `Lequal | `Greater | `Nequal 
-    | `Gequal | `Always ]
+    [ `Never | `Less | `Equal | `Lequal | `Greater | `Nequal | `Gequal 
+    | `Always ]
 
-  type depth = { depth_test : depth_test option; depth_write : bool;
-                 depth_offset : float * float; 
-                 (** factor, units, see glPolygonOffset *) }
-  (** The type for depth state *) 
+  type depth = 
+    { depth_test : depth_test option; 
+      depth_write : bool;
+      depth_offset : float * float; }
 
-  let default_depth = { depth_test = Some `Less; depth_write = true; 
-                        depth_offset = (0., 0.) }
+  let default_depth = 
+    { depth_test = Some `Less; 
+      depth_write = true; 
+      depth_offset = (0., 0.) }
+
+  (* Blend state *) 
+
+  type blend_mul = 
+    [ `Zero | `One
+    | `Src | `One_minus_src
+    | `Src_a | `One_minus_src_a | `Src_a_saturate
+    | `Src1 | `One_minus_src1
+    | `Src1_a | `One_minus_src1_a
+    | `Dst | `One_minus_dst
+    | `Dst_a | `One_minus_dst_a
+    | `Cst | `One_minus_cst
+    | `Cst_a | `One_minus_cst_a ]
+
+  type blend_eq = 
+    [ `Add of blend_mul * blend_mul 
+    | `Sub of blend_mul * blend_mul 
+    | `Rev_sub of blend_mul * blend_mul
+    | `Min 
+    | `Max ]
+
+  type blend =  
+    { blend : bool;
+      blend_rgb : blend_eq;
+      blend_a : blend_eq;
+      blend_cst : color; }
+
+  let default_blend_eq = `Add (`Src_a, `One_minus_src_a)
+  let default_blend = 
+    { blend = false; 
+      blend_rgb = default_blend_eq; 
+      blend_a = default_blend_eq; 
+      blend_cst = Color.void; }
+
+  let blend_alpha = { default_blend with blend = true } 
+
+  (* Effect *) 
 
   type t = 
     { raster : raster; 
       depth : depth;
+      blend : blend;
       prog : Prog.t; 
       mutable uniforms : Uniform.set; 
       mutable info : Info.t; } 
 
-  let create ?(raster = default_raster) ?(depth = default_depth) ?uniforms
-      prog =
+  let create 
+      ?(raster = default_raster) ?(depth = default_depth) 
+      ?(blend = default_blend) ?uniforms prog 
+    =
     let uniforms = match uniforms with 
     | None -> Prog.uniforms prog 
     | Some us -> us
     in
-    { raster; depth; prog; uniforms; info = Info.none }
+    { raster; depth; blend; prog; uniforms; info = Info.none }
            
   let prog e = e.prog
   let uniforms e = e.uniforms 
@@ -1032,6 +1074,7 @@ module Effect = struct
   let set_uniform e u v = e.uniforms <- Uniform.def e.uniforms u v
   let raster e = e.raster
   let depth e = e.depth
+  let blend e = e.blend
   
   (* Renderer info *) 
 
