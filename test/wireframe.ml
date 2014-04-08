@@ -20,7 +20,7 @@ let back = Litu.Effect.Wireframe.create
   
 let front = Litu.Effect.Wireframe.create 
     ~raster:{ Effect.raster_face_cull = Some `Back }
-    ~depth:{ Effect.default_depth with Effect.depth_test = Some `Lequal } 
+    ~depth:{ Effect.depth_default with Effect.depth_test = Some `Lequal } 
     ~wire_color:Color.black
     ~wire_only:true
     ~wire_width:6.0

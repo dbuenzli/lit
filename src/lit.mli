@@ -833,8 +833,8 @@ module Effect : sig
   type raster = { raster_face_cull : raster_face_cull option } 
   (** The type for raster state. *) 
 
-  val default_raster : raster
-  (** [default_raster] is [{ cull = None }]. *) 
+  val raster_default : raster
+  (** [raster_default] is [{ cull = None }]. *) 
 
   (** {1 Depth state} 
 
@@ -853,12 +853,12 @@ module Effect : sig
                  (** factor, units, see glPolygonOffset *) }
   (** The type for depth state. *) 
 
-  val default_depth : depth
-  (** [default_depth] is the default depth state:
+  val depth_default : depth
+  (** [depth] is the default depth state:
       {ul 
-      {- [default_depth.depth_test] is [Some `Less].}
-      {- [default_depth.depth_write] is [true].}
-      {- [default_depth.depth_offset] is [(0., 0.)]}} *)
+      {- [depth_default.depth_test] is [Some `Less].}
+      {- [depth_default.depth_write] is [true].}
+      {- [depth_default.depth_offset] is [(0., 0.)]}} *)
   
   (** {1 Blend state}
       
@@ -892,8 +892,8 @@ module Effect : sig
       {- [`Min], component wise [min a b].}
       {- [`Max], component wise [max a b].}} *)
 
-  val default_blend_eq : blend_eq
-  (** [default_blend_eq] is [`Add (Src_a, One_minus_src_a)]. *) 
+  val blend_eq_default : blend_eq
+  (** [blend_default_eq] is [`Add (Src_a, One_minus_src_a)]. *) 
 
   type blend =  
     { blend : bool; (** [true] if blending should be performed. *)
@@ -902,16 +902,16 @@ module Effect : sig
       blend_cst : color; (** Blend color for [`Cst_*] multiplier. *)  }
   (** The type for blend states. *)
 
-  val default_blend : blend
-  (** [default_blend] is the default blend state:
+  val blend_default : blend
+  (** [blend_default] is the default blend state:
       {ul
-      {- [default_blend.blend] is [false].}
-      {- [default_blend.blend_rgb] is {!default_blend_eq}.}
-      {- [default_blend.blend_a] is {!default_blend_eq}.}
-      {- [default_blend.blenc_cst] is {!Gg.Color.void}.}} *)
+      {- [blend_default.blend] is [false].}
+      {- [blend_default.blend_rgb] is {!blend_default_eq}.}
+      {- [blend_default.blend_a] is {!blend_default_eq}.}
+      {- [blend_default.blenc_cst] is {!Gg.Color.void}.}} *)
 
   val blend_alpha : blend
-  (** [blend_alpha] is [default_blend] with the [blend] field 
+  (** [blend_alpha] is [blend_default] with the [blend] field 
       to [true]. *) 
 
   (** {1 Effect} *) 
@@ -924,7 +924,7 @@ module Effect : sig
   (** [create raster depth blend uniforms prog] is an effect that uses the GPU 
       program [prog]. [raster], [depth] and [blend] respectively define 
       the rasterization, depth buffer and blend states (resp. default 
-      to {!default_raster}, {!default_depth}, {!default_blend}). 
+      to {!raster_default}, {!depth_default}, {!blend_default}). 
       [uniforms] is the uniforms used with [prog] (defaults to 
       [Prog.uniforms (prog e)]). *) 
     

@@ -1029,7 +1029,7 @@ module Effect = struct
 
   let set_blend_state b = 
     if not b.blend then Gl.disable Gl.blend else
-    begin 
+    begin
       Gl.enable Gl.blend;
       let eq_rgb, a_rgb, b_rgb = enums_of_blend_eq b.blend_rgb in 
       let eq_a, a_a, b_a = enums_of_blend_eq b.blend_a in
@@ -1038,7 +1038,7 @@ module Effect = struct
       Gl.blend_func_separate a_rgb b_rgb a_a b_a;
       Color.(Gl.blend_color (r cst) (g cst) (b cst) (a cst))
     end
-
+    
   let set_state r e = 
     let raster = raster e in 
     let depth = depth e in 
@@ -1134,9 +1134,9 @@ let create ?compiler_msg_parser log ~debug size =
   { init = false;
     debug; log; compiler_msg_parser; 
     clears = Renderer.default_clears;
-    raster = Lit.Effect.default_raster; 
-    depth = Lit.Effect.default_depth; 
-    blend = Lit.Effect.default_blend;
+    raster = Lit.Effect.raster_default; 
+    depth = Lit.Effect.depth_default; 
+    blend = Lit.Effect.blend_default;
     size; 
     view = View.create ();
     world_to_clip = lazy M4.id;

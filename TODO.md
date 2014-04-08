@@ -35,3 +35,4 @@
   then generate the data. Makes more sense as you get to learn the
   actual layout before reading the generating code.
 * Review sample_format to gl types. 
+

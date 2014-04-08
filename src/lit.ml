@@ -995,7 +995,7 @@ module Effect = struct
  
   type raster_face_cull = [ `Front | `Back ] 
   type raster = { raster_face_cull : raster_face_cull option } 
-  let default_raster = { raster_face_cull = None } 
+  let raster_default = { raster_face_cull = None } 
 
   (* Depth state *) 
 
@@ -1008,7 +1008,7 @@ module Effect = struct
       depth_write : bool;
       depth_offset : float * float; }
 
-  let default_depth = 
+  let depth_default = 
     { depth_test = Some `Less; 
       depth_write = true; 
       depth_offset = (0., 0.) }
@@ -1039,14 +1039,14 @@ module Effect = struct
       blend_a : blend_eq;
       blend_cst : color; }
 
-  let default_blend_eq = `Add (`Src_a, `One_minus_src_a)
-  let default_blend = 
+  let blend_eq_default = `Add (`Src_a, `One_minus_src_a)
+  let blend_default = 
     { blend = false; 
-      blend_rgb = default_blend_eq; 
-      blend_a = default_blend_eq; 
+      blend_rgb = blend_eq_default; 
+      blend_a = blend_eq_default; 
       blend_cst = Color.void; }
 
-  let blend_alpha = { default_blend with blend = true } 
+  let blend_alpha = { blend_default with blend = true } 
 
   (* Effect *) 
 
@@ -1059,8 +1059,8 @@ module Effect = struct
       mutable info : Info.t; } 
 
   let create 
-      ?(raster = default_raster) ?(depth = default_depth) 
-      ?(blend = default_blend) ?uniforms prog 
+      ?(raster = raster_default) ?(depth = depth_default) 
+      ?(blend = blend_default) ?uniforms prog 
     =
     let uniforms = match uniforms with 
     | None -> Prog.uniforms prog 
