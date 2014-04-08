@@ -12,14 +12,14 @@ open Lit
 (* TODO change that when we have multipass *) 
 
 let back = Litu.Effect.Wireframe.create 
-    ~raster:{ Effect.raster_cull = Some `Front }
+    ~raster:{ Effect.raster_face_cull = Some `Front }
     ~wire_color:(Color.gray 0.8)
     ~fill_color:(Color.gray 0.95)
     ~wire_width: 2.0
     ()
   
 let front = Litu.Effect.Wireframe.create 
-    ~raster:{ Effect.raster_cull = Some `Back }
+    ~raster:{ Effect.raster_face_cull = Some `Back }
     ~depth:{ Effect.default_depth with Effect.depth_test = Some `Lequal } 
     ~wire_color:Color.black
     ~wire_only:true

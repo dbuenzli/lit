@@ -993,9 +993,9 @@ module Effect = struct
 
   (* Rasterization state *) 
  
-  type cull = [ `Front | `Back ] 
-  type raster = { raster_cull : cull option } 
-  let default_raster = { raster_cull = None } 
+  type raster_face_cull = [ `Front | `Back ] 
+  type raster = { raster_face_cull : raster_face_cull option } 
+  let default_raster = { raster_face_cull = None } 
 
   (* Depth state *) 
 

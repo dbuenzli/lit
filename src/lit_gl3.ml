@@ -112,6 +112,9 @@ type t =
     mutable log : Log.t; 
     mutable compiler_msg_parser : Log.compiler_msg_parser;
     mutable clears : Renderer.clears;
+    mutable raster : Effect.raster; (* Last setup raster state *) 
+    mutable depth : Effect.depth;   (* Last setup depth state *) 
+    mutable blend : Effect.blend;   (* Last setup blend state *)
     mutable size : size2;
     mutable view : view;
     mutable world_to_clip : m4 Lazy.t; (* cache *) 
@@ -957,13 +960,15 @@ end
 module Effect = struct
   include Renderer.Private.Effect
 
-  let set_raster_state r e = match (raster e).raster_cull with 
+  let enum_of_raster_face_cull = function 
+  | `Front -> Gl.front 
+  | `Back -> Gl.back 
+
+  let set_raster_state r = match r.raster_face_cull with 
   | None -> Gl.disable Gl.cull_face_enum
   | Some cull -> 
       Gl.enable Gl.cull_face_enum; 
-      match cull with 
-      | `Front -> Gl.cull_face Gl.front
-      | `Back -> Gl.cull_face Gl.back
+      Gl.cull_face (enum_of_raster_face_cull cull)
 
   let enum_of_depth_test = function 
   | `Less ->  Gl.less
@@ -975,8 +980,7 @@ module Effect = struct
   | `Gequal -> Gl.gequal
   | `Always -> Gl.always
 
-  let set_depth_state r e =
-    let d = depth e in 
+  let set_depth_state d =
     Gl.depth_mask d.depth_write;
     match d.depth_test with 
     | None -> Gl.disable Gl.depth_test
@@ -1023,8 +1027,7 @@ module Effect = struct
   | `Max -> 
       Gl.max, Gl.one (* irrelevant *), Gl.one (* irrelevant *)
 
-  let set_blend_state r e = 
-    let b = blend e in 
+  let set_blend_state b = 
     if not b.blend then Gl.disable Gl.blend else
     begin 
       Gl.enable Gl.blend;
@@ -1035,6 +1038,15 @@ module Effect = struct
       Gl.blend_func_separate a_rgb b_rgb a_a b_a;
       Color.(Gl.blend_color (r cst) (g cst) (b cst) (a cst))
     end
+
+  let set_state r e = 
+    let raster = raster e in 
+    let depth = depth e in 
+    let blend = blend e in 
+    if r.raster != raster then (r.raster <- raster; set_raster_state raster);
+    if r.depth != depth then (r.depth <- depth; set_depth_state depth);
+    if r.blend != blend then (r.blend <- blend; set_blend_state blend);
+    ()
 end
 
 let init_gl_state r = 
@@ -1081,9 +1093,7 @@ let init_framebuffer r clear =
 let render_op r prog_info op = 
   Prog.bind_prim r prog_info op.prim; 
   Prog.bind_uniforms r prog_info op;
-  Effect.set_raster_state r op.effect; 
-  Effect.set_depth_state r op.effect; 
-  Effect.set_blend_state r op.effect; 
+  Effect.set_state r op.effect;
   match Prim.index op.prim with
   | None -> 
       let prim_info = Prim.get_info op.prim in
@@ -1124,6 +1134,9 @@ let create ?compiler_msg_parser log ~debug size =
   { init = false;
     debug; log; compiler_msg_parser; 
     clears = Renderer.default_clears;
+    raster = Lit.Effect.default_raster; 
+    depth = Lit.Effect.default_depth; 
+    blend = Lit.Effect.default_blend;
     size; 
     view = View.create ();
     world_to_clip = lazy M4.id;
@@ -1131,6 +1144,9 @@ let create ?compiler_msg_parser log ~debug size =
 
 let init r =
   init_gl_state r; 
+  Effect.set_raster_state r.raster;
+  Effect.set_depth_state r.depth;
+  Effect.set_blend_state r.blend;
   ()
 
 let size r = r.size 

@@ -827,10 +827,10 @@ module Effect : sig
       {b Note.} Faces with a counter clockwise orientation are front 
       faces. *) 
 
-  type cull = [ `Front | `Back ] 
+  type raster_face_cull = [ `Front | `Back ] 
   (** The type for face culling. *) 
-
-  type raster = { raster_cull : cull option } 
+                          
+  type raster = { raster_face_cull : raster_face_cull option } 
   (** The type for raster state. *) 
 
   val default_raster : raster
@@ -1212,7 +1212,10 @@ module Renderer : sig
     end
 
     module Effect : sig
-      include module type of Effect
+      include module type of Effect with type raster = Effect.raster
+                                     and type depth = Effect.depth 
+                                     and type blend = Effect.blend
+                                                         
       val info : effect -> Info.t
       val set_info : effect -> Info.t -> unit
     end
