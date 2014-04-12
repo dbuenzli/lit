@@ -111,7 +111,7 @@ module Effect : sig
       {b References.}  
       {ul 
       {- J.A Boerentzen et al. 
-         {{:http://cgg-journal.com/2008-2/06/index.html.}
+         {{:http://cgg-journal.com/2008-2/06/index.html}
          Shader-Based Wireframe Drawing}. 
     Computer Graphics & Geometry Journal, 2008.}}. *)
   module Wireframe : sig 
