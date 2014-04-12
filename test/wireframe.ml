@@ -38,7 +38,7 @@ let rot = ref None
 
 (* Render *) 
 
-let clears = { Renderer.default_clears with 
+let clears = { Renderer.clears_default with 
                Renderer.clear_color = Some Color.white }
 
 let draw r = 

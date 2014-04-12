@@ -79,7 +79,7 @@ let draw r =
   Renderer.render r
 
 let resize r size =
-  let clears = { Renderer.default_clears with 
+  let clears = { Renderer.clears_default with 
                  Renderer.clear_color = Some Color.white }
   in
   let aspect = Size2.w size /. Size2.h size in

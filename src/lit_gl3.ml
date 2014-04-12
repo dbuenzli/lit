@@ -1133,7 +1133,7 @@ let create ?compiler_msg_parser log ~debug size =
   in
   { init = false;
     debug; log; compiler_msg_parser; 
-    clears = Renderer.default_clears;
+    clears = Renderer.clears_default;
     raster = Lit.Effect.raster_default; 
     depth = Lit.Effect.depth_default; 
     blend = Lit.Effect.blend_default;
