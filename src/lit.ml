@@ -1209,7 +1209,7 @@ module Renderer = struct
       clear_depth : float option; 
       clear_stencil : int option; }
 
-  let default_clears = 
+  let clears_default = 
     { clear_color = Some Color.black;
       clear_depth = Some 1.; 
       clear_stencil = None; }

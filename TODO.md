@@ -35,4 +35,8 @@
   then generate the data. Makes more sense as you get to learn the
   actual layout before reading the generating code.
 * Review sample_format to gl types. 
-
+* Want more control on how ops are going to be drawn. This goes 
+  in pair with multipass and opacity and view setup. 
+  
+  Maybe we should leave the sorting to higher-level abstractions and
+  Renderer should be immediate mode. 

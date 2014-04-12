@@ -1243,7 +1243,7 @@ module Renderer : sig
       clear_depth : float option; 
       clear_stencil : int option; }
 
-  val default_clears : clears
+  val clears_default : clears
 
   (** The type for a renderer backend. *) 
   module type T = sig
