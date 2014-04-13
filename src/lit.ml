@@ -1252,7 +1252,7 @@ module Renderer = struct
 
   let nop = { count = 1; effect = Effect.create (Prog.create []); 
               uniforms = Uniform.empty; tr = M4.id; 
-              prim = Prim.create `Triangles [] }
+              prim = Prim.create ~count:0 `Triangles [] }
 
   type t = R : (module T with type t = 'a) * 'a -> t
     
