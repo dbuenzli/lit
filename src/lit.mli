@@ -1231,10 +1231,13 @@ module Renderer : sig
 
   (** {1:ops Render operations} *) 
 
+  
   val op : ?count:int -> ?uniforms:Uniform.set -> ?tr:m4 -> effect -> prim -> op
   (** [op count uniforms tr e p] is a render op. [count] defaults to 1. 
       [uniforms] defaults to {!Uniform.empty}, [tr] to {!M4.id}. *)
-
+    
+  val nop : op 
+  (** [nop] is a render no-op, it has no effect on the renderer. *) 
 
   (** {1:renderers Renderers} *)
 

@@ -1250,6 +1250,9 @@ module Renderer = struct
   let op ?(count = 1) ?(uniforms = Uniform.empty) ?(tr = M4.id) effect prim = 
     { count; effect; uniforms; tr; prim }
 
+  let nop = { count = 1; effect = Effect.create (Prog.create []); 
+              uniforms = Uniform.empty; tr = M4.id; 
+              prim = Prim.create `Triangles [] }
 
   type t = R : (module T with type t = 'a) * 'a -> t
     
@@ -1266,7 +1269,7 @@ module Renderer = struct
   let set_view (R ((module R), r)) v = R.set_view r v
   let clears (R ((module R), r)) = R.clears r 
   let set_clears (R ((module R), r)) clears = R.set_clears r clears
-  let add_op (R ((module R), r)) op = R.add_op r op
+  let add_op (R ((module R), r)) op = if op != nop then R.add_op r op
   let render ?(clear = true) (R ((module R), r)) = R.render r ~clear
   let release (R ((module R), r)) = R.release r
 
