@@ -10,7 +10,7 @@ depends: [ "ocamlfind" "gg" ]
 depopts: [ "tgls" "js_of_ocaml"  ]
 build:
 [
-  [ "./pkg/pkg-git" ]
+  [ "ocaml" "pkg/git.ml" ]
   [ "ocaml" "pkg/build.ml" "native=%{ocaml-native}%" 
                            "native-dynlink=%{ocaml-native}%" # TODO change
                            "tgls=%{tgls:installed}%" 
