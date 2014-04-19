@@ -96,7 +96,7 @@ module Gl_hi = struct                         (* Wraps a few Gl functions. *)
           String.sub stack nl (String.length stack - nl - 1)
         with Not_found -> "????:??" 
       in
-      Printf.eprintf "%s: %s%!" loc (error_to_string e)
+      Printf.eprintf "%s: %s\n%!" loc (error_to_string e)
     end
 
   (* Enum maps *) 
@@ -140,7 +140,7 @@ let log_debug r msg = r.log `Debug msg
 
 module Cap = struct
   include Renderer.Private.Cap
-
+            
   (* Shader capabilities *) 
 
   let shader_kinds = [ `Vertex; `Fragment; `Geometry ]
@@ -162,6 +162,17 @@ module Cap = struct
 
   let gl_vendor r = match Gl.get_string Gl.vendor with 
   | None -> "unknown" | Some r -> r    
+
+  type caps = 
+    { c_max_samples : int;
+      c_max_tex_size : int; 
+      c_max_render_buffer_size : int; }
+
+  let caps r = 
+    { c_max_samples = Gl_hi.get_int (Gl.get_integerv Gl.max_samples); 
+      c_max_tex_size = Gl_hi.get_int (Gl.get_integerv Gl.max_texture_size); 
+      c_max_render_buffer_size = 
+        Gl_hi.get_int (Gl.get_integerv Gl.max_renderbuffer_size); }
 end
 
 (* Bufs *) 
@@ -336,6 +347,8 @@ module Tex = struct
   | `D1 -> Gl.texture_1d 
   | `D2 -> Gl.texture_2d 
   | `D3 -> Gl.texture_3d 
+  | `D2_ms -> Gl.texture_2d_multisample
+  | `D3_ms -> Gl.texture_2d_multisample_array
   | `Buffer -> Gl.texture_buffer
 
   let enum_of_min_filter = function 
@@ -499,10 +512,16 @@ module Tex = struct
         Gl.tex_parameteri target Gl.texture_wrap_t wrap_t; 
         Gl.tex_parameteri target Gl.texture_wrap_r wrap_r; 
         Gl.tex_image3d target 0 internal w h d 0 format type_ (`Offset 0);
+    | `D2_ms -> 
+        let scount, fixed = multisample t in
+        Gl.tex_image2d_multisample target scount internal w h fixed;
+    | `D3_ms -> 
+        let scount, fixed = multisample t in
+        Gl.tex_image3d_multisample target scount internal w h d fixed
     | `Buffer -> 
         Gl.tex_buffer target internal buf_id
     end;
-    if kind <> `Buffer then begin
+    if kind = `D1 || kind = `D2 || kind = `D3 then begin
       let mag = enum_of_mag_filter (Tex.mag_filter t) in 
       let min = enum_of_min_filter (Tex.min_filter t) in
       Gl.tex_parameteri target Gl.texture_mag_filter mag; 
@@ -1295,7 +1314,8 @@ let render r ~clear =
   let batches = r.batches in 
   r.batches <- Imap.empty;
   Imap.iter (render_batch r) batches;
-  Gl_hi.check_error ()
+  Gl_hi.check_error ();
+  ()
   
 let release r = ()
   

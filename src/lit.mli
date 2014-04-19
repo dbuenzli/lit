@@ -407,7 +407,7 @@ module Tex : sig
   val pp_min_filter : Format.formatter -> min_filter -> unit 
   (** [pp_mag_filter ppf m] prints a textual representation of [m] on [ppf] *)
 
-  type kind = [ `D1 | `D2 | `D3 | `Buffer ]
+  type kind = [ `D1 | `D2 | `D3 | `D2_ms | `D3_ms | `Buffer ]
   (** The type for kinds of textures. TODO add `Cube_map *) 
 
   val pp_kind : Format.formatter -> kind -> unit 
@@ -440,6 +440,8 @@ module Tex : sig
     [ `D1 of sample_format * float * Buf.t option
     | `D2 of sample_format * size2 * Buf.t option
     | `D3 of sample_format * size3 * Buf.t option
+    | `D2_ms of sample_format * size2 * int * bool 
+    | `D3_ms of sample_format * size3 * int * bool
     | `Buffer of sample_format * Buf.t ]
   (** The type for texture initialisation, determines the kind 
       of the the texture.
@@ -470,7 +472,7 @@ module Tex : sig
          [`D1], [`D2] or [`D3] according to the raster's dimension.}} 
 
       @raise Invalid_argument If the raster's sample format dimension is 
-      greater than 4. *)
+      greater than 4 or if [kind] specifies a multisample texture. *)
       
   type t = tex
   (** The type for textures. *) 
@@ -538,6 +540,11 @@ module Tex : sig
 
   val mag_filter : tex -> mag_filter 
   (** [min_filter t] is [t]'s magnification filter. *) 
+
+  val multisample : tex -> int * bool 
+  (** [multisample t] is [t]'s multisample parameters.
+      
+      @raise Invalid_argument if [t]'s kind is not [`D{2,3}_ms]. *) 
 
   val pp : Format.formatter -> tex -> unit
   (** [pp ppf t] is a textual represenation of [t] on [ppf]. *) 
@@ -1225,7 +1232,7 @@ module Renderer : sig
       val none : t
     end
 
-    module Cap : sig 
+    module Cap : sig
       val parse_version : string -> (int * int * int) option 
     end
 
@@ -1338,6 +1345,13 @@ module Renderer : sig
         [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
       val gl_renderer : t -> string 
       val gl_vendor : t -> string 
+
+      type caps = 
+        { c_max_samples : int;
+          c_max_tex_size : int; 
+          c_max_render_buffer_size : int; }
+
+      val caps : t -> caps 
     end
 
     module Buf : sig
@@ -1412,6 +1426,12 @@ module Renderer : sig
     val pp_gl_synopsis : Format.formatter -> renderer -> unit
     (** [pp_gl_synopsis ppf r] prints a short two lines summary 
         of the OpenGL implementation [r] is dealing with. *)
+
+    (** {1 Renderer limits.} *) 
+
+    val max_samples : renderer -> int
+    val max_tex_size : renderer -> int
+    val max_render_buffer_size : renderer -> int
   end
 
   (** Renderer specific buffer functions. *)

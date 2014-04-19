@@ -35,6 +35,8 @@ let err_prim_not_uint t = str "index's scalar type not unsigned integer (%s)" t
 let err_prim_attr_dup n = str "attribute %s specified more than once" n
 let err_miss_uniform k = str "no uniform %s" k
 let err_neg_arg arg v = str "negative argument %s (%d)" arg v
+let err_not_mstex k = str "not a multisample texture (%s) k" k
+let err_mstex = str "can't specify the data of a multisample texture" 
 
 (* Renderer ids. *) 
 
@@ -384,10 +386,11 @@ module Tex = struct
       
   let pp_mag_filter = pp_min_filter
 
-  type kind = [ `D1 | `D2 | `D3 | `Buffer ]
+  type kind = [ `D1 | `D2 | `D3 | `D2_ms | `D3_ms | `Buffer ]
 
   let pp_kind ppf k = pp ppf begin match k with 
-    | `D1 -> "D1" | `D2 -> "D2" | `D3 -> "D3" | `Buffer -> "Buffer"
+    | `D1 -> "D1" | `D2 -> "D2" | `D3 -> "D3" | `D2_ms -> "D2_ms" 
+    | `D3_ms -> "D3_ms" | `Buffer -> "Buffer"
     end
 
   type sample_format = 
@@ -434,6 +437,8 @@ module Tex = struct
     [ `D1 of sample_format * float * Buf.t option
     | `D2 of sample_format * size2 * Buf.t option
     | `D3 of sample_format * size3 * Buf.t option
+    | `D2_ms of sample_format * size2 * int * bool 
+    | `D3_ms of sample_format * size3 * int * bool 
     | `Buffer of sample_format * Buf.t ]
 
   let pp_buf_opt ppf = function 
@@ -448,8 +453,14 @@ module Tex = struct
       pp ppf "@[<1>(tex-init D2@ %a@ %a@ %a)@]" 
         pp_sample_format sf V2.pp s pp_buf_opt buf
   | `D3 (sf, s, buf) -> 
-      pp ppf "@[<1>(tex-init D3@ %a@ %a@ %a)@]" 
+      pp ppf "@[<1>(tex-init D3@ %a@ %a %a)@]" 
         pp_sample_format sf V3.pp s pp_buf_opt buf
+  | `D2_ms (sf, s, scount, fixed) -> 
+      pp ppf "@[<1>(tex-init D2_ms@ %a@ %a@ %d@ %b)@]" 
+        pp_sample_format sf V2.pp s scount fixed
+  | `D3_ms (sf, s, scount, fixed) -> 
+      pp ppf "@[<1>(tex-init D3@ %a@ %a@ %d@ %b)@]" 
+        pp_sample_format sf V3.pp s scount fixed
   | `Buffer (sf, buf) ->
       pp ppf "@[<1>(tex-init Buffer %a %a)@]" 
         pp_sample_format sf Buf.pp buf 
@@ -489,6 +500,7 @@ module Tex = struct
     | `Buffer -> 
         let buf = match buf with Some buf -> buf | None -> assert false in
         `Buffer (sample_format, buf)
+    | `D2_ms | `D3_ms -> invalid_arg err_mstex
 
   type t = 
     { kind : kind; 
@@ -501,6 +513,7 @@ module Tex = struct
       mutable wrap_t : wrap;
       mutable wrap_r : wrap;
       mutable mipmaps : bool; 
+      mutable multisample : (int * bool) option;
       mutable min_filter : min_filter; 
       mutable mag_filter : mag_filter; 
       mutable info : Info.t; }
@@ -515,7 +528,8 @@ module Tex = struct
       wrap_s = `Repeat; 
       wrap_t = `Repeat; 
       wrap_r = `Repeat; 
-      mipmaps = false; 
+      mipmaps = false;
+      multisample = None; 
       min_filter = `Nearest_mipmap_linear; 
       mag_filter = `Nearest;
       info = Info.none; }
@@ -524,11 +538,21 @@ module Tex = struct
       ?(mipmaps = false) ?(min_filter = `Nearest_mipmap_linear) 
       ?(mag_filter = `Nearest) ?buf_autorelease init = 
     (* TODO buffer length checks *) 
-    let sformat, kind, size, buf, default_buf_autorelease = match init with 
-    | `D1 (fmt, s, b) -> fmt, `D1, Size3.v s 1. 1., b, true 
-    | `D2 (fmt, s, b) -> fmt, `D2, Size3.v (Size2.w s) (Size2.h s) 1., b, true 
-    | `D3 (fmt, s, b) -> fmt, `D3, s, b, true
-    | `Buffer (fmt, b) -> fmt, `Buffer, Size3.zero, Some b, false
+    let sformat, kind, size, buf, default_buf_autorelease, multisample = 
+      match init with 
+      | `D1 (fmt, s, b) -> 
+          fmt, `D1, Size3.v s 1. 1., b, true, None
+      | `D2 (fmt, s, b) -> 
+          fmt, `D2, Size3.v (Size2.w s) (Size2.h s) 1., b, true, None
+      | `D3 (fmt, s, b) -> 
+          fmt, `D3, s, b, true, None
+      | `D2_ms (fmt, s, scount, fixed) -> 
+          fmt, `D2_ms, Size3.v (Size2.w s) (Size2.h s) 1., None, false, 
+          Some (scount, fixed)
+      | `D3_ms (fmt, s, scount, fixed) -> 
+          fmt, `D3_ms, s, None, false, Some (scount, fixed) 
+      | `Buffer (fmt, b) -> 
+          fmt, `Buffer, Size3.zero, Some b, false, None
     in
     let buf_autorelease = match buf_autorelease with 
     | None -> default_buf_autorelease
@@ -539,6 +563,7 @@ module Tex = struct
       gpu_update = true;
       wrap_s; wrap_t; wrap_r;
       mipmaps; min_filter; mag_filter;
+      multisample;
       info = Info.none; }
   
   let sample_format t = t.sample_format
@@ -557,6 +582,9 @@ module Tex = struct
   let mipmaps t = t.mipmaps
   let min_filter t = t.min_filter
   let mag_filter t = t.mag_filter 
+  let multisample t = match t.multisample with 
+  | None -> invalid_arg (err_not_mstex (str "%a" pp_kind t.kind)) 
+  | Some m -> m
 
   let pp ppf t = 
     pp ppf "@[<1>(tex@ %a@ %a@ %a@ @[<1>(wrap@ %a@ %a@ %a)@]@ \
@@ -1278,6 +1306,13 @@ module Renderer = struct
         [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
       val gl_renderer : t -> string 
       val gl_vendor : t -> string 
+
+      type caps =
+        { c_max_samples : int;
+          c_max_tex_size : int;
+          c_max_render_buffer_size : int; }
+        
+      val caps : t -> caps 
     end
 
     module Buf : sig
@@ -1360,12 +1395,16 @@ module Renderer = struct
     let glsl_version (R ((module R), r)) = R.Cap.glsl_version r
     let gl_renderer (R ((module R), r)) = R.Cap.gl_renderer r
     let gl_vendor (R ((module R), r)) = R.Cap.gl_vendor r
-
     let pp_gl_synopsis ppf r = 
       pp ppf "@[Renderer %s@ -- OpenGL %a / GLSL %a@]" 
         (gl_renderer r) 
         pp_gl_version (gl_version r) 
         pp_gl_version (glsl_version r)
+
+    let max_samples (R ((module R), r)) = (R.Cap.caps r).R.Cap.c_max_samples
+    let max_tex_size (R ((module R), r)) = (R.Cap.caps r).R.Cap.c_max_tex_size
+    let max_render_buffer_size (R ((module R), r)) = 
+      (R.Cap.caps r).R.Cap.c_max_render_buffer_size
   end
 
   module Private = struct    
