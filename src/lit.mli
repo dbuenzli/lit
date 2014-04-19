@@ -1357,13 +1357,20 @@ module Renderer : sig
       val caps : t -> caps 
     end
 
-    module Buf : sig
-      val map : t -> [ `R | `W | `RW ]  -> Buf.t -> 
-        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
-      val unmap : t -> Buf.t -> unit
-    end
-    
     module Fbuf : sig 
+      type read_buf = 
+        [ `Color_r of int 
+        | `Color_g of int 
+        | `Color_b of int 
+        | `Color_rgb of int 
+        | `Color_rgba of int
+        | `Depth
+        | `Stencil 
+        | `Depth_stencil ]
+      
+      val async_read : t -> Fbuf.t -> read_buf -> pos:p2 -> size:size2 -> 
+        buf -> unit
+      
       val complete : t -> Fbuf.t -> 
         [ `Complete
         | `Incomplete_attachement
@@ -1488,8 +1495,31 @@ module Renderer : sig
         result in program termination. *)
   end
 
-  (** Renderer specifiec framebuffer functions. *) 
+  (** Renderer specific framebuffer functions. *) 
   module Fbuf : sig 
+    
+    type read_buf = 
+      [ `Color_r of int 
+      | `Color_g of int 
+      | `Color_b of int 
+      | `Color_rgb of int 
+      | `Color_rgba of int
+      | `Depth
+      | `Stencil 
+      | `Depth_stencil ]
+    (** The type for framebuffer buffer read. For color components the
+        integer denotes the color attachement.  *) 
+
+    val async_read : t -> Fbuf.t -> read_buf -> pos:p2 -> size:size2 -> 
+      buf -> unit
+    (** [async_read t f fmt buf] asynchronously reads the contents of 
+        framebuffer [f] according to [fmt]
+        and stores the result in [buf]. 
+
+        @raise Invalid_argument if [`Depth_stencil] is used and 
+        the scalar type of [buf] is not `UInt32 (the data is packed
+        as 24 bits of depth and 8 bits of stencil). *)
+      
     val complete : t -> Fbuf.t -> 
       [ `Complete
       | `Incomplete_attachement
@@ -1543,4 +1573,3 @@ end
    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   ---------------------------------------------------------------------------*)
-

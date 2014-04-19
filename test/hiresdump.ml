@@ -68,6 +68,28 @@ let resize r size =
 
 let draw r app = draw r; App.update_surface app
 
+let dump r app = 
+  draw r app; (* make sure we have things in the back buffer *) 
+  let size = App.surface_size app in
+  let w = Float.int_of_round (Size2.w size) in 
+  let h = Float.int_of_round (Size2.h size) in 
+  let pos = P2.o in
+  let fmt = Raster.Sample.(format rgb_l `UInt8) in
+  let scalar_count = Raster.Sample.scalar_count ~w ~h fmt in
+  let buf = Buf.create (`Gpu (`UInt8, scalar_count)) in 
+  Renderer.Fbuf.async_read r Fbuf.default (`Color_rgb 0) ~pos ~size buf; 
+  let ba = Renderer.Buf.map r `R buf Ba.UInt8 in
+  let fname = "/tmp/out.tga" in 
+  Format.printf "w:%d h:%d sc:%d buf:%a balen:%d\n" w h 
+    scalar_count Buf.pp buf (Ba.length ba);
+  begin match Tga.write fname `Color_rgb size ba with 
+  | `Ok () -> () | `Error e -> Printf.eprintf "%s: %s" fname e
+  end;
+  Renderer.Buf.unmap r buf;
+  `Ok 
+
+
+
 let rec command r app = function 
 | `Init -> resize r (App.surface_size app); `Ok 
 | `Resize size -> resize r size; draw r app; `Ok
@@ -100,6 +122,9 @@ let rec command r app = function
     | `Mouse (`Button (`Down, `Left, pt)) -> command r app (`Rot_start pt)
     | `Mouse (`Button (`Up, `Left, pt)) -> command r app (`Rot_end pt)
     | `Mouse (`Motion (pt, _)) -> command r app (`Rot_update pt)
+    | `Key (`Down, (`Uchar 0x0064)) -> 
+        Printf.printf "dumping%!";
+        dump r app
     | _ -> `Ok
     end
 | _ -> `Ok

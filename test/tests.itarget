@@ -4,3 +4,5 @@ sinex.native
 diffuse.native
 wireframe.native
 checkboard.native
+blur.native
+highresdump.native

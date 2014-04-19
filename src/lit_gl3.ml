@@ -1200,6 +1200,48 @@ module Fbuf = struct
     let s = Gl.check_framebuffer_status Gl.framebuffer in 
     Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf);
     try List.assoc s status_enum_to_variant with Not_found -> failwith "TODO"
+
+  type read_buf = 
+    [ `Color_r of int
+    | `Color_g of int
+    | `Color_b of int
+    | `Color_rgb of int
+    | `Color_rgba of int
+    | `Depth
+    | `Depth_stencil
+    | `Stencil ] 
+
+  let async_read r fbuf rb ~pos ~size buf = 
+    let fid = setup r fbuf in 
+    let bid = Buf.setup r buf in
+    let x = Float.int_of_round (V2.x pos) in 
+    let y = Float.int_of_round (V2.y pos) in 
+    let w = Float.int_of_round (Size2.w size) in 
+    let h = Float.int_of_round (Size2.h size) in
+    let st = Buf.(enum_of_scalar_type (scalar_type buf)) in
+    let mode c = 
+      if fbuf == Fbuf.default then Gl.back else
+      Gl.color_attachment0 + c 
+    in
+    let fmt, st = match rb with 
+    | `Color_r c -> Gl.read_buffer (mode c); Gl.red, st
+    | `Color_g c -> Gl.read_buffer (mode c); Gl.green, st
+    | `Color_b c -> Gl.read_buffer (mode c); Gl.blue, st
+    | `Color_rgb c -> Gl.read_buffer (mode c); Gl.rgb, st
+    | `Color_rgba c -> Gl.read_buffer (mode c); Gl.rgba, st
+    | `Depth -> Gl.read_buffer Gl.back; Gl.depth_component, st
+    | `Depth_stencil -> 
+        if Buf.scalar_type buf <> `UInt32 
+        then invalid_arg "buffer must be of scalar type `UInt32";
+        Gl.read_buffer Gl.back; Gl.depth_stencil, Gl.unsigned_int_24_8
+    | `Stencil ->
+        Gl.read_buffer Gl.back; Gl.stencil_index, st                          
+    in
+    Gl.bind_framebuffer Gl.framebuffer fid; 
+    Gl.bind_buffer Gl.pixel_pack_buffer bid; 
+    Gl.read_pixels x y w h fmt st (`Offset 0);
+    Gl.bind_buffer Gl.pixel_pack_buffer 0; 
+    Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf)
 end
 
 

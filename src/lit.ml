@@ -1317,13 +1317,20 @@ module Renderer = struct
       val caps : t -> caps 
     end
 
-    module Buf : sig
-      val map : t -> [ `R | `W | `RW ]  -> Buf.t -> 
-        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
-      val unmap : t -> Buf.t -> unit
-    end
-
     module Fbuf : sig 
+      type read_buf = 
+        [ `Color_r of int 
+        | `Color_g of int 
+        | `Color_b of int 
+        | `Color_rgb of int 
+        | `Color_rgba of int
+        | `Depth
+        | `Stencil 
+        | `Depth_stencil ]
+        
+      val async_read : t -> Fbuf.t -> read_buf -> pos:p2 -> size:size2 -> 
+        Buf.t -> unit
+
       val complete : t -> Fbuf.t -> 
         [ `Complete
         | `Incomplete_attachement
@@ -1432,12 +1439,27 @@ module Renderer = struct
   end
 
   module Buf = struct
+    let sync_cpu_to_gpu (R ((module R), r)) buf = R.Buf.sync_cpu_to_gpu r buf
+    let sync_gpu_to_cpu (R ((module R), r)) buf = R.Buf.sync_gpu_to_cpu r buf
     type access = [ `R | `W | `RW ]
     let map (R ((module R), r)) m buf k = R.Buf.map r m buf k 
     let unmap (R ((module R), r)) buf = R.Buf.unmap r buf
   end
 
   module Fbuf = struct
+      type read_buf = 
+        [ `Color_r of int 
+        | `Color_g of int 
+        | `Color_b of int 
+        | `Color_rgb of int 
+        | `Color_rgba of int
+        | `Depth
+        | `Stencil 
+        | `Depth_stencil ]
+        
+    let async_read (R ((module R), r)) fbuf rb ~pos ~size buf = 
+      R.Fbuf.async_read r fbuf rb ~pos ~size buf
+        
     let complete (R ((module R), r)) fbuf = R.Fbuf.complete r fbuf
   end
 end
