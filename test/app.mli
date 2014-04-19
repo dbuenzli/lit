@@ -23,6 +23,9 @@ type t
 val update_surface : t -> unit 
 (** [update_surface a] update's [a]'s rendering surface. *) 
 
+
+val surface_size : t -> size2
+
 (** {1 Fullscreen} *) 
 
 val toggle_fullscreen : t -> unit
