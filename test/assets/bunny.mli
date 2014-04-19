@@ -5,76 +5,17 @@
   ---------------------------------------------------------------------------*)
 
 open Lit
-open Gg
 
-let pp = Format.printf 
+(** The Stanford Bunny primitive. 
 
-let default_size = Size2.v 600. 400.
+    Data source is from the PLY file available 
+    {{:http://www-graphics.stanford.edu/data/3Dscanrep/}here}. *) 
 
-(* Primitive cycler *) 
-
-let prim_cycler ?(normals = false) ?prims () = 
-  let prims = match prims with 
-  | Some [] -> invalid_arg "prims is the empty list"
-  | Some prims -> prims 
-  | None -> 
-      let with_normals p = if normals then Litu.Prim.with_normals p else p in
-      [ lazy (with_normals (Litu.Prim.cube 1.)); 
-        lazy (with_normals (Litu.Prim.sphere ~level:4 0.5)); 
-        lazy (with_normals (Litu.Prim.rect (`Size (Size2.v 1. 1.))));
-        lazy (with_normals (Bunny.create ~scale:1.5 ())) ]
-  in
-  let cycle = ref prims in
-  let rec loop () = match !cycle with 
-  | [] -> cycle := prims; loop () 
-  | p :: ps -> cycle := ps; Lazy.force p
-  in
-  loop 
-
-(* Default commands *) 
-
-type cmd = 
-  [ `Init | `Exit | `Resize of size2 | `Tick of float 
-  | `Toggle_fullscreen | `Cycle_prim | `None of App.ev ]
-
-let command_of_key = function
-| `Escape -> Some `Exit
-| `Space -> Some `Toggle_fullscreen
-| `Digit 1 -> Some `Cycle_prim
-| _ -> None
-
-let event_to_command = function
-| `Env (`Init | `Exit | `Resize _ as cmd) -> cmd
-| `Key (`Up, k) as e -> 
-    begin match command_of_key k with 
-    | Some cmd -> cmd
-    | None -> `None e
-    end
-| `Tick _ as cmd -> cmd
-| e -> `None e
-
-let ev_of_command_handler cmd_handler =
-  fun app e -> cmd_handler app (event_to_command e)
-
-(* Terminal output *) 
-
-let show_start r = 
-  pp "@[%a@]@." Renderer.Cap.pp_gl_synopsis r 
-
-let last_show_stats = ref 0.
-let show_stats now draw v update v' = 
-  let (), draw = App.time draw v in 
-  let (), swap = App.time update v' in 
-  let now = now *. 1e6 in
-  let swap = swap *. 1e6 in 
-  let draw = draw *. 1e6 in
-  Printf.printf "\r\x1B[K\
-                 frame:\x1B[01m%4.0fμs\x1B[m \
-                 (draw:%4.0fμs update:%4.0fμs) dt:%5.0fμs%!"
-    (swap +. draw) draw swap (now -. !last_show_stats); 
-  last_show_stats := now
-
-let show_stop () = Printf.printf "\n%!"
+val create : ?file:string -> ?scale:float -> unit -> prim
+(** [create scale ()] is a Stanford Bunny. If [scale] is specified the
+    primitive has a transform that puts the center of the bunny at the
+    origin and the maximal extent of its axis aligned bounding box is
+    [scale]. *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2014 Daniel C. Bünzli.
