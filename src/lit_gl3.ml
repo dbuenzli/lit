@@ -227,8 +227,7 @@ module Buf = struct
     set_info b i; 
     i
 
-  let setup r b = 
-    if not (Buf.gpu_upload b) then () else
+  let setup r b =
     let id = match info b with 
     | Some info -> info.id
     | None -> 
@@ -236,20 +235,44 @@ module Buf = struct
         let info = setup_info r b id in
         info.id
     in
+    if not (Buf.gpu_upload b) then id else (* TODO unclear for `Gpu *) 
     let usage = enum_of_usage (Buf.usage b) in
-    let byte_count = cpu_byte_count b in
     Gl.bind_buffer Gl.array_buffer id; 
     Gl.buffer_data Gl.array_buffer 0 None usage; (* mark buffer as unused. *) 
     begin match cpu_p b with 
-    | None -> Gl.buffer_data Gl.array_buffer byte_count None usage
-    | Some (Ba ba) -> Gl.buffer_data Gl.array_buffer byte_count (Some ba) usage
+    | None -> 
+        let byte_count = gpu_byte_count b in
+        Gl.buffer_data Gl.array_buffer byte_count None usage
+    | Some (Ba ba) -> 
+        let byte_count = cpu_byte_count b in
+        Gl.buffer_data Gl.array_buffer byte_count (Some ba) usage;
+        set_gpu_count b (Buf.cpu_count b);
     end;
     Gl.bind_buffer Gl.array_buffer 0; 
-    set_gpu_count b (Buf.cpu_count b);
     set_gpu_exists b true;
     Buf.set_gpu_upload b false;
-    if Buf.cpu_autorelease b then Buf.set_cpu b None
+    if Buf.cpu_autorelease b then Buf.set_cpu b None; 
+    id
 
+  let sync_cpu_to_gpu r b = 
+    if not (Buf.cpu_exists b) then invalid_arg "no cpu buffer" else
+    Buf.set_gpu_upload b true; 
+    ignore (setup r b)
+
+  let sync_gpu_to_cpu r b = 
+    if not (Buf.gpu_exists b) then invalid_arg "no gpu buffer" else 
+    let info = get_info b in
+    let gpu_count = Buf.gpu_count b in
+    if Buf.cpu_count b <> gpu_count 
+    then set_cpu_p b (create_bigarray_any (Buf.scalar_type b) gpu_count);
+    match cpu_p b with 
+    | None -> assert false 
+    | Some (Ba ba) ->
+        let byte_count = cpu_byte_count b in
+        Gl.bind_buffer Gl.array_buffer info.id;
+        Gl.get_buffer_sub_data Gl.array_buffer 0 byte_count ba;
+        Gl.bind_buffer Gl.array_buffer 0
+      
   (* Mapping the GPU buffer. 
      
      FIXME: Improve safety. What could be done is keep a ref 
@@ -257,21 +280,19 @@ module Buf = struct
      zero once we unmap (would need to do it in C I guess).  *)
 
   let map r access b st = 
-    setup r b; 
+    let id = setup r b in 
     check_ba_scalar_type b st;
     let kind = Ba.ba_kind_of_ba_scalar_type st in
-    let info = get_info b in 
     let access = enum_of_access access in
-    let count = Buf.gpu_count b in 
-    Gl.bind_buffer Gl.array_buffer info.id; 
+    let count = Buf.gpu_count b in
+    Gl.bind_buffer Gl.array_buffer id; 
     let ba = Gl.map_buffer Gl.array_buffer count access kind in 
     Gl.bind_buffer Gl.array_buffer 0;
     ba
 
   let unmap r b = 
-    setup r b;
-    let info = get_info b in
-    Gl.bind_buffer Gl.array_buffer info.id;
+    let id = setup r b in 
+    Gl.bind_buffer Gl.array_buffer id;
     ignore (Gl.unmap_buffer Gl.array_buffer); 
     Gl.bind_buffer Gl.array_buffer 0
 end
@@ -317,20 +338,20 @@ module Prim = struct
 
   let setup r p = match info p with 
   | Some _ -> 
-      let update_attr a = Buf.setup r (Attr.buf a) in
+      let update_attr a = ignore (Buf.setup r (Attr.buf a)) in
       Prim.iter update_attr p; 
       begin match index p with 
       | None -> () 
-      | Some b -> Buf.setup r b
+      | Some b -> ignore (Buf.setup r b)
       end
   | None -> 
       let id = Gl_hi.gen_vertex_array () in
       let info = setup_info r p id in
       let index_id = match index p with 
       | None -> 0 
-      | Some index -> Buf.setup r index; (Buf.get_info index).Buf.id
+      | Some index -> Buf.setup r index
       in
-      Prim.iter (fun a -> Buf.setup r (Attr.buf a)) p;
+      Prim.iter (fun a -> ignore (Buf.setup r (Attr.buf a))) p;
       Gl.bind_vertex_array info.id;
       Gl.bind_buffer Gl.element_array_buffer index_id;
       (* attrs are bound later, see Prog.bind_prim *) 
@@ -481,7 +502,7 @@ module Tex = struct
     if not (Tex.gpu_update t) then id else
     let buf_id = match Tex.buf t with 
     | None -> 0 
-    | Some b -> Buf.setup r b; (Buf.get_info b).Buf.id 
+    | Some b -> Buf.setup r b
     in
     let kind = Tex.kind t in
     let target = target_enum_of_kind kind in
@@ -1250,7 +1271,7 @@ let render_op r prog_info op =
 let render_batch r id batch =
   let prog_info = Prog.get_info (Effect.prog (List.hd batch).effect) in
   Prog.use r id; List.iter (render_op r prog_info) batch
- 
+   
 (* Renderer.T implementation *) 
 
 let name = "Lit %%VERSION%% GL 3.x renderer"

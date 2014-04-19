@@ -60,7 +60,7 @@ end
 
 module Buf = struct
 
-  (* FIXME: this module has three uses of Obj.magic. It will be 
+  (* FIXME: this module has two uses of Obj.magic. It will be 
      possible to eliminate all of them once we have GADTs for bigarray 
      kinds. http://caml.inria.fr/mantis/view.php?id=6064 *) 
         
@@ -114,33 +114,34 @@ module Buf = struct
       mutable info : Info.t; }
     
   let create ?(cpu_autorelease = true) ?(usage = `Static_draw) init =
-    let create scalar_type ~cpu ~gpu_upload = 
+    let create scalar_type ?(gpu_count = 0) cpu = 
       { usage; scalar_type; 
-        gpu_count = 0; gpu_exists = false; gpu_upload; 
+        gpu_count; gpu_exists = false; gpu_upload = true; 
         cpu_autorelease; cpu; info = Info.none }
     in
     match init with 
     | `Cpu (scalar_type, cpu_count) -> 
         let cpu = Some (create_bigarray_any scalar_type cpu_count) in
-        create scalar_type ~cpu ~gpu_upload:true
+        create scalar_type cpu
     | `Gpu (scalar_type, gpu_count) -> 
-        create scalar_type ~cpu:None ~gpu_upload:false
-    | `Int8 ba -> create `Int8 ~cpu:(Some (Ba ba)) ~gpu_upload:true
-    | `Int16 ba -> create `Int16 ~cpu:(Some (Ba ba)) ~gpu_upload:true
-    | `Int32 ba -> create `Int32 ~cpu:(Some (Ba ba)) ~gpu_upload:true
-    | `Int64 ba -> create `Int64 ~cpu:(Some (Ba ba)) ~gpu_upload:true
-    | `UInt8 ba -> create `UInt8 ~cpu:(Some (Ba ba)) ~gpu_upload:true
-    | `UInt16 ba -> create `UInt16 ~cpu:(Some (Ba ba)) ~gpu_upload:true
-    | `UInt32 ba -> create `UInt32 ~cpu:(Some (Ba ba)) ~gpu_upload:true
-    | `UInt64 ba -> create `UInt64 ~cpu:(Some (Ba ba)) ~gpu_upload:true
-    | `Float16 ba -> create `Float16 ~cpu:(Some (Ba ba)) ~gpu_upload:true
-    | `Float32 ba -> create `Float32 ~cpu:(Some (Ba ba)) ~gpu_upload:true
-    | `Float64 ba -> create `Float64 ~cpu:(Some (Ba ba)) ~gpu_upload:true
+        create scalar_type ~gpu_count None 
+    | `Int8 ba -> create `Int8 (Some (Ba ba)) 
+    | `Int16 ba -> create `Int16 (Some (Ba ba)) 
+    | `Int32 ba -> create `Int32 (Some (Ba ba)) 
+    | `Int64 ba -> create `Int64 (Some (Ba ba)) 
+    | `UInt8 ba -> create `UInt8 (Some (Ba ba)) 
+    | `UInt16 ba -> create `UInt16 (Some (Ba ba)) 
+    | `UInt32 ba -> create `UInt32 (Some (Ba ba)) 
+    | `UInt64 ba -> create `UInt64 (Some (Ba ba)) 
+    | `Float16 ba -> create `Float16 (Some (Ba ba)) 
+    | `Float32 ba -> create `Float32 (Some (Ba ba)) 
+    | `Float64 ba -> create `Float64 (Some (Ba ba))
         
   let usage b = b.usage 
   let scalar_type b = b.scalar_type
 
   let gpu_count b = b.gpu_count 
+  let gpu_byte_count b = b.gpu_count * (Ba.scalar_type_byte_count b.scalar_type)
   let set_gpu_count b count = b.gpu_count <- count 
   let gpu_exists b = b.gpu_exists
   let set_gpu_exists b e = b.gpu_exists <- e
@@ -173,6 +174,7 @@ module Buf = struct
   | Some cpu -> cpu 
 
   let cpu_p b = b.cpu
+  let set_cpu_p b cpu = b.cpu <- Some cpu
 
   let check_kind b k =
     let open Bigarray in
@@ -1332,6 +1334,14 @@ module Renderer = struct
         | `Incomplete_read_buffer
         | `Undefined
         | `Unsupported ]
+    end
+
+    module Buf : sig
+      val sync_cpu_to_gpu : t -> Buf.t -> unit
+      val sync_gpu_to_cpu : t -> Buf.t -> unit
+      val map : t -> [ `R | `W | `RW ]  -> Buf.t -> 
+        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
+      val unmap : t -> Buf.t -> unit
     end
   end
   

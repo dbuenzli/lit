@@ -1239,10 +1239,13 @@ module Renderer : sig
     module Buf : sig
       include module type of Buf
       type bigarray_any = Ba : ('a, 'b) bigarray -> bigarray_any
+      val create_bigarray_any : Gg.Ba.scalar_type -> int -> bigarray_any
+      val gpu_byte_count : buf -> int 
       val set_gpu_count : buf -> int -> unit 
       val set_gpu_exists : buf -> bool -> unit
       val cpu_byte_count : buf -> int 
       val cpu_p : buf -> bigarray_any option
+      val set_cpu_p : buf -> bigarray_any -> unit
       val check_ba_scalar_type : buf -> ('a, 'b) Ba.ba_scalar_type -> unit
       val info : buf -> Info.t
       val set_info : buf -> Info.t -> unit
@@ -1370,9 +1373,17 @@ module Renderer : sig
         | `Incomplete_multisample
         | `Incomplete_read_buffer
         | `Undefined
-        | `Unsupported ]
+        | `Unsupported ]      
+    end 
+
+    module Buf : sig
+      val sync_cpu_to_gpu : t -> Buf.t -> unit
+      val sync_gpu_to_cpu : t -> Buf.t -> unit
+      val map : t -> [ `R | `W | `RW ]  -> Buf.t -> 
+        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
+      val unmap : t -> Buf.t -> unit
     end
-  end 
+  end
   
   type t = renderer 
   (** The type for renderers. *)
@@ -1437,6 +1448,22 @@ module Renderer : sig
   (** Renderer specific buffer functions. *)
   module Buf : sig
 
+    (** {1 Buffer synchronisation} *) 
+
+    val sync_cpu_to_gpu : renderer -> buf -> unit 
+    (** [sync_cpu_to_gpu r b] uploads the CPU buffer of [b] to the GPU buffer. 
+        A GPU buffer is created if none existed yet. 
+        
+        @raise Invalid_argument if {!Buf.cpu_exists} is [false]. *)
+  
+    val sync_gpu_to_cpu : renderer -> buf -> unit
+    (** [gpu_to_cpu r b] reads back [b]'s GPU buffer into [b]'s 
+        CPU buffer. A CPU buffer is created in none existed yet or if 
+        the size of the CPU buffer is different from the size of the
+        GPU buffer.
+
+        @raise Invalid_argument if {!Buf.gpu_exists} is [false]. *)
+
     (** {1 Mapping GPU buffers in CPU} *) 
 
     val map : renderer -> [ `R | `W | `RW ] -> Buf.t 
@@ -1452,7 +1479,7 @@ module Renderer : sig
         @raise Invalid_argument if [st] does not match [buf]'s
         scalar type. *)
 
-    val unmap : renderer -> Buf.t -> unit
+    val unmap : renderer -> buf -> unit
     (** [unmap r b] unmaps the buffer [b]. 
 
         {b Warning.} This invalidates the memory pointed to 
