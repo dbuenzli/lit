@@ -1085,6 +1085,44 @@ end
 type op = { count : int; effect : Effect.t; uniforms : Uniform.set; 
             tr : m4; prim : Prim.t }
 
+
+module Fbuf = struct
+
+  (** Render buffers. *) 
+  module Rbuf = struct
+    
+    type t = { multisample : int option; 
+               size : size2; 
+               sample_format : Tex.sample_format; 
+               mutable info : Info.t }
+  
+    let create ?multisample size sample_format = 
+      { multisample; size; sample_format; info = Info.none }
+
+    let size2 b = b.size 
+    let sample_format b = b.sample_format
+    let multisample b = b.multisample
+    let info b = b.info
+    let set_info b i = b.info <- i
+  end
+  
+  type image = 
+    [ `Tex of int * Tex.t | `Tex_layer of int * int * Tex.t | `Rbuf of Rbuf.t ] 
+  
+  type attachement = 
+    [ `Color of int * image 
+    | `Depth of image | `Stencil of image | `Depth_stencil of image ]
+
+  type t = { attachements : attachement list; mutable info : Info.t }
+
+  let default = { attachements = []; info = Info.none }
+  let create attachements = { attachements; info = Info.none }
+  let attachements f = f.attachements
+  let info f = f.info
+  let set_info f i = f.info <- i
+end
+
+
 module Renderer = struct
 
   module Log = struct
@@ -1227,6 +1265,8 @@ module Renderer = struct
     val clears : t -> clears 
     val set_clears : t -> clears -> unit
     val add_op : t -> op -> unit
+    val fbuf : t -> Fbuf.t
+    val set_fbuf : t -> Fbuf.t -> unit
     val render : t -> clear:bool -> unit
     val release : t -> unit
 
@@ -1245,8 +1285,21 @@ module Renderer = struct
         ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
       val unmap : t -> Buf.t -> unit
     end
-  end 
 
+    module Fbuf : sig 
+      val complete : t -> Fbuf.t -> 
+        [ `Complete
+        | `Incomplete_attachement
+        | `Incomplete_draw_buffer
+        | `Incomplete_layer_targets
+        | `Incomplete_missing_attachement
+        | `Incomplete_multisample
+        | `Incomplete_read_buffer
+        | `Undefined
+        | `Unsupported ]
+    end
+  end
+  
   let op ?(count = 1) ?(uniforms = Uniform.empty) ?(tr = M4.id) effect prim = 
     { count; effect; uniforms; tr; prim }
 
@@ -1270,6 +1323,8 @@ module Renderer = struct
   let clears (R ((module R), r)) = R.clears r 
   let set_clears (R ((module R), r)) clears = R.set_clears r clears
   let add_op (R ((module R), r)) op = if op != nop then R.add_op r op
+  let fbuf (R ((module R), r)) = R.fbuf r
+  let set_fbuf (R ((module R), r)) fbuf = R.set_fbuf r fbuf
   let render ?(clear = true) (R ((module R), r)) = R.render r ~clear
   let release (R ((module R), r)) = R.release r
 
@@ -1323,6 +1378,7 @@ module Renderer = struct
     module Tex = Tex
     module Prog = Prog
     module Effect = Effect
+    module Fbuf = Fbuf
     module Log = Log
   end
 
@@ -1330,6 +1386,10 @@ module Renderer = struct
     type access = [ `R | `W | `RW ]
     let map (R ((module R), r)) m buf k = R.Buf.map r m buf k 
     let unmap (R ((module R), r)) buf = R.Buf.unmap r buf
+  end
+
+  module Fbuf = struct
+    let complete (R ((module R), r)) fbuf = R.Fbuf.complete r fbuf
   end
 end
 
@@ -1341,6 +1401,7 @@ type 'a uniform = 'a Uniform.t
 type prog = Prog.t
 type effect = Effect.t
 type view = View.t
+type fbuf = Fbuf.t
 type renderer = Renderer.t
 
 (*---------------------------------------------------------------------------

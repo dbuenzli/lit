@@ -952,8 +952,12 @@ end
 
 (** {1 Rendering} *) 
 
+
 type view
 (** The type for rendered views. *)
+
+type fbuf 
+(** The type for framebuffers. *) 
 
 (** Views. 
 
@@ -1074,6 +1078,54 @@ module View : sig
       {- [oy' = V3.(unit (cross oz ox'))] to {!V3.oy}}} 
       The final up vector [oy'] matches exactly up only if [up]
       is orthogonal the the forward direction [at - from]. *)
+end
+
+(** Framebuffers. *)
+module Fbuf : sig
+
+  (** Render buffers. 
+
+      Render buffers are images that can be attached to framebuffers
+      but in contrast to textures cannot be used by shaders. *) 
+  module Rbuf : sig
+    type t
+    (** The type for render buffers. *)
+
+    val create : ?multisample:int -> size2 -> Tex.sample_format -> t
+    (** [create mutisample size fmt] is an image with 
+        size [size] and sample format [fmt]. [multisample] is the number
+        of sample for multisample framebuffers. *)
+
+    val multisample : t -> int option 
+    (** [multisample b] is [b]'s multisample value. *) 
+
+    val size2 : t -> size2 
+    (** [size2 b] is [b]'s size. *) 
+
+    val sample_format : t -> Tex.sample_format 
+    (** [sample_format b] is [b]'s sample format. *) 
+  end
+
+  type image = 
+    [ `Tex of int * tex | `Tex_layer of int * int * tex | `Rbuf of Rbuf.t ] 
+  (** The type for images. *) 
+  
+  type attachement = 
+    [ `Color of int * image 
+    | `Depth of image | `Stencil of image | `Depth_stencil of image ]
+  (** The type for image attachements. *) 
+
+  type t = fbuf 
+  (** The type for framebuffers. *) 
+
+  val default : fbuf
+  (** [default] is the default framebuffer. *) 
+  
+  val create : attachement list -> fbuf 
+  (** [create attachements] is a framebuffer with attachements [attachments]. *)
+
+  val attachements : fbuf -> attachement list 
+  (** [attachements f] is [f]'s attachements. *) 
 end
 
 type renderer 
@@ -1220,6 +1272,17 @@ module Renderer : sig
       val set_info : effect -> Info.t -> unit
     end
 
+    module Fbuf : sig 
+      module Rbuf : sig 
+        include module type of Fbuf.Rbuf with type t = Fbuf.Rbuf.t
+        val info : t -> Info.t 
+        val set_info : t -> Info.t -> unit
+      end
+      include module type of Fbuf with module Rbuf := Rbuf
+      val info : fbuf -> Info.t 
+      val set_info : fbuf -> Info.t -> unit
+    end
+    
     module Log : sig 
       include module type of Log 
       val split_string : char -> string -> string list 
@@ -1262,6 +1325,8 @@ module Renderer : sig
     val clears : t -> clears 
     val set_clears : t -> clears -> unit
     val add_op : t -> op -> unit
+    val fbuf : t -> fbuf 
+    val set_fbuf : t -> fbuf -> unit
     val render : t -> clear:bool -> unit
     val release : t -> unit
 
@@ -1280,6 +1345,19 @@ module Renderer : sig
         ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
       val unmap : t -> Buf.t -> unit
     end
+    
+    module Fbuf : sig 
+      val complete : t -> Fbuf.t -> 
+        [ `Complete
+        | `Incomplete_attachement
+        | `Incomplete_draw_buffer
+        | `Incomplete_layer_targets
+        | `Incomplete_missing_attachement
+        | `Incomplete_multisample
+        | `Incomplete_read_buffer
+        | `Undefined
+        | `Unsupported ]
+    end
   end 
   
   type t = renderer 
@@ -1295,6 +1373,8 @@ module Renderer : sig
   val clears : t -> clears 
   val set_clears : t -> clears -> unit
   val add_op : renderer -> op -> unit
+  val fbuf : renderer -> fbuf
+  val set_fbuf : renderer -> fbuf -> unit
   val render : ?clear:bool -> renderer -> unit
   val release : renderer -> unit
   
@@ -1361,6 +1441,19 @@ module Renderer : sig
         result in program termination. *)
   end
 
+  (** Renderer specifiec framebuffer functions. *) 
+  module Fbuf : sig 
+    val complete : t -> Fbuf.t -> 
+      [ `Complete
+      | `Incomplete_attachement
+      | `Incomplete_draw_buffer
+      | `Incomplete_layer_targets
+      | `Incomplete_missing_attachement
+      | `Incomplete_multisample
+      | `Incomplete_read_buffer
+      | `Undefined
+      | `Unsupported ]      
+  end
 end
 
 (** {1 Remarks and tips} 
@@ -1403,3 +1496,4 @@ end
    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   ---------------------------------------------------------------------------*)
+

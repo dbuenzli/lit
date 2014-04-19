@@ -47,6 +47,16 @@ module Gl_hi = struct                         (* Wraps a few Gl functions. *)
   let gen_texture () = get_int (Gl.gen_textures 1) 
   let delete_texture id = set_int (Gl.delete_textures 1) id
 
+  (* Render buffer objects *) 
+
+  let gen_render_buffer () = get_int (Gl.gen_renderbuffers 1)
+  let delete_render_buffer id = set_int (Gl.delete_renderbuffers 1) id
+
+  (* Framebuffer objects *) 
+      
+  let gen_framebuffer () = get_int (Gl.gen_framebuffers 1)
+  let delete_framebuffer id = set_int (Gl.delete_framebuffers 1) id
+      
   (* Shader objects *) 
 
   let get_shader_int sid e = get_int (Gl.get_shaderiv sid e)
@@ -120,6 +130,7 @@ type t =
     mutable world_to_clip : m4 Lazy.t; (* cache *) 
     mutable 
       batches : op list Imap.t; (* maps programs ids to rendering operations *) 
+    mutable fbuf : fbuf;
   }
 
 let log_error r msg = r.log `Error msg 
@@ -446,7 +457,7 @@ module Tex = struct
     i
 
   let setup r t = 
-    if t == Tex.nil then () else
+    if t == Tex.nil then 0 else
     let id = match info t with
     | Some info -> info.id
     | None -> 
@@ -454,7 +465,7 @@ module Tex = struct
         let info = setup_info r t id  in
         info.id
     in
-    if not (Tex.gpu_update t) then () else
+    if not (Tex.gpu_update t) then id else
     let buf_id = match Tex.buf t with 
     | None -> 0 
     | Some b -> Buf.setup r b; (Buf.get_info b).Buf.id 
@@ -502,7 +513,7 @@ module Tex = struct
     Gl.bind_buffer Gl.pixel_unpack_buffer 0; 
     Tex.set_gpu_update t false;
     if Tex.buf_autorelease t then Tex.set_buf t None;
-    ()
+    id
 end
 
 (* Programs *) 
@@ -896,7 +907,7 @@ module Prog = struct
               if t == Tex.nil then 
                 log_error r (`Msg (str "%s uniform value is nil texture" name))
               else
-              let tid = Tex.setup r t; (Tex.get_info t).Tex.id in
+              let tid = Tex.setup r t in
               let target = Tex.target_enum_of_kind (Tex.kind t) in
               Gl.active_texture (Gl.texture0 + !next_active_tex); 
               Gl.bind_texture target tid;
@@ -1049,6 +1060,109 @@ module Effect = struct
     ()
 end
 
+module Fbuf = struct
+
+  module Rbuf_impl = struct 
+    include Renderer.Private.Fbuf.Rbuf
+
+    type info = { id : Id.t; }    (* Associated GL render buffer object id. *) 
+      
+    let inject, project = Info.create () 
+    let info b = project (info b)
+    let get_info b = match info b with None -> assert false | Some i -> i
+    let set_info b (i : info) = set_info b (inject i)
+
+    let finalise_info i =
+      Gl_hi.delete_render_buffer i.id
+
+    let setup_info r b id = 
+      let i = { id; } in 
+      Gc.finalise finalise_info i;
+      set_info b i; 
+      i
+      
+    let setup r b = match info b with 
+    | Some info -> info.id
+    | None -> 
+        let id = Gl_hi.gen_render_buffer () in
+        let _ = setup_info r b id in
+        let w = Float.int_of_round (Size2.w (size2 b)) in 
+        let h = Float.int_of_round (Size2.h (size2 b)) in 
+        let f = Tex.internal_format_enum_of_format (sample_format b) in
+        let m = match multisample b with None -> 0 | Some m -> m in
+        Gl.bind_renderbuffer Gl.renderbuffer id;
+        Gl.renderbuffer_storage_multisample Gl.renderbuffer m f w h; 
+        id
+
+  end
+
+  include Renderer.Private.Fbuf 
+
+  type info = { id : Id.t; }         (* Associated GL framebuffer object id. *)
+  let inject, project = Info.create () 
+  let info b = project (info b)
+  let get_info b = match info b with None -> assert false | Some i -> i
+  let set_info b (i : info) = set_info b (inject i)
+
+  let finalise_info i =
+    Gl_hi.delete_framebuffer i.id
+
+  let setup_info r f id = 
+    let i = { id; } in 
+    Gc.finalise finalise_info i;
+    set_info f i; 
+    i
+
+  let attach r a = 
+    let attach pt = function 
+    | `Rbuf b -> 
+        let bid = Rbuf_impl.setup r b in
+        Gl.framebuffer_renderbuffer Gl.framebuffer pt Gl.renderbuffer bid
+    | `Tex (level, t) ->
+        let tid = Tex.setup r t in
+        Gl.framebuffer_texture Gl.framebuffer pt tid level
+    | `Tex_layer (level, layer, t) ->
+        let tid = Tex.setup r t in 
+        Gl.framebuffer_texture_layer Gl.framebuffer pt tid level layer
+    in
+    match a with 
+    | `Color (n, i) -> attach (Gl.color_attachment0 + n) i
+    | `Depth i -> attach Gl.depth_attachment i
+    | `Depth_stencil i -> attach Gl.depth_stencil_attachment i 
+    | `Stencil i -> attach Gl.stencil i
+
+  let setup r f = 
+    if f == Fbuf.default then 0 else
+    match info f with 
+    | Some info -> info.id
+    | None -> 
+        let id = Gl_hi.gen_framebuffer () in
+        let _ = setup_info r f id in
+        Gl.bind_framebuffer Gl.framebuffer id;
+        List.iter (attach r) (attachements f);
+        id
+
+  let status_enum_to_variant = 
+    [ Gl.framebuffer_complete, `Complete;
+      Gl.framebuffer_undefined, `Undefined; 
+      Gl.framebuffer_incomplete_attachment, `Incomplete_attachement; 
+      Gl.framebuffer_incomplete_missing_attachment, 
+      `Incomplete_missing_attachement; 
+      Gl.framebuffer_incomplete_draw_buffer, `Incomplete_draw_buffer; 
+      Gl.framebuffer_incomplete_read_buffer, `Incomplete_read_buffer; 
+      Gl.framebuffer_unsupported, `Unsupported; 
+      Gl.framebuffer_incomplete_multisample, `Incomplete_multisample; 
+      Gl.framebuffer_incomplete_layer_targets, `Incomplete_layer_targets; ]
+
+  let complete r fbuf = 
+    let id = setup r fbuf in 
+    Gl.bind_framebuffer Gl.framebuffer id; 
+    let s = Gl.check_framebuffer_status Gl.framebuffer in 
+    Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf);
+    try List.assoc s status_enum_to_variant with Not_found -> failwith "TODO"
+end
+
+
 let init_gl_state r = 
   Gl.enable Gl.scissor_test;
   Gl.enable Gl.blend;
@@ -1140,7 +1254,8 @@ let create ?compiler_msg_parser log ~debug size =
     size; 
     view = View.create ();
     world_to_clip = lazy M4.id;
-    batches = Imap.empty; }
+    batches = Imap.empty; 
+    fbuf = Fbuf.default; }
 
 let init r =
   init_gl_state r; 
@@ -1159,7 +1274,6 @@ let set_view r view =
 let clears r = r.clears 
 let set_clears r clears = r.clears <- clears
 
-
 let add_op r op =  
   if not r.init then (r.init <- true; init r);
   match Prog.setup r (Effect.prog op.effect) with 
@@ -1169,6 +1283,12 @@ let add_op r op =
       r.batches <- Imap.add prog_id (op :: batches) r.batches; 
       Prim.setup r op.prim
 
+let fbuf r = r.fbuf
+let set_fbuf r fbuf =
+  let id = Fbuf.setup r fbuf in 
+  Gl.bind_framebuffer Gl.framebuffer id; 
+  r.fbuf <- fbuf
+  
 let render r ~clear =
   if not r.init then (r.init <- true; init r);
   init_framebuffer r clear;
