@@ -35,12 +35,14 @@ let prim_cycler ?(normals = false) ?prims () =
 
 type cmd = 
   [ `Init | `Exit | `Resize of size2 | `Tick of float 
-  | `Toggle_fullscreen | `Cycle_prim | `None of App.ev ]
+  | `Toggle_fullscreen | `Cycle_prim | `None of App.ev | `Move_in | `Move_out ]
 
 let command_of_key = function
 | `Escape -> Some `Exit
 | `Space -> Some `Toggle_fullscreen
 | `Digit 1 -> Some `Cycle_prim
+| `Arrow `Up -> Some `Move_in 
+| `Arrow `Down -> Some `Move_out
 | _ -> None
 
 let event_to_command = function

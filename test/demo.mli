@@ -19,10 +19,10 @@ val prim_cycler : ?normals:bool -> ?prims:(Prim.t Lazy.t) list -> unit ->
 
 type cmd = 
   [ `Init | `Exit | `Resize of size2 | `Tick of float 
-  | `Toggle_fullscreen | `Cycle_prim | `None of App.ev ]
+  | `Toggle_fullscreen | `Cycle_prim | `None of App.ev | `Move_in | `Move_out ]
 
 val command_of_key : App.keysym -> 
-  [> `Toggle_fullscreen | `Cycle_prim | `Exit ] option
+  [> `Toggle_fullscreen | `Cycle_prim | `Exit | `Move_in | `Move_out ] option
 
 val event_to_command : App.ev -> cmd 
 
