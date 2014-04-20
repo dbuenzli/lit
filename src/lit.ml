@@ -38,7 +38,9 @@ let err_neg_arg arg v = str "negative argument %s (%d)" arg v
 let err_not_mstex k = str "not a multisample texture (%s) k" k
 let err_mstex = str "can't specify the data of a multisample texture" 
 
-(* Renderer backend info *) 
+module Smap = Map.Make(String) 
+
+(* Backend info *) 
 
 module BInfo = struct
   type t = exn         (* universal type, see http://mlton.org/UniversalType *) 
@@ -50,15 +52,13 @@ module BInfo = struct
 end
 
 (* These types need to be defined here for being able to define 
-   the [renderer] type. *) 
-
-module Smap = Map.Make(String) 
+   the [renderer] type, so that we can use it in the modules. *) 
 
 (* Buffers *) 
 
 module Buf_types = struct 
 
-  type usage = 
+  type usage =
     [ `Static_draw | `Static_read | `Static_copy
     | `Stream_draw | `Stream_read | `Stream_copy
     | `Dynamic_draw | `Dynamic_read | `Dynamic_copy ]
@@ -368,6 +368,8 @@ end
 
 type fbuf = Fbuf_types.t
 
+(* Renderer types *) 
+
 module Log_types = struct
 
   type compiler_msg = 
@@ -578,17 +580,16 @@ module Buf = struct
   let cpu_p b = b.cpu
   let set_cpu_p b cpu = b.cpu <- Some cpu 
   let cpu_autorelease b = b.cpu_autorelease
-  let set_cpu_autorelease b bool = b.cpu_autorelease <- bool
-      
+  let set_cpu_autorelease b bool = b.cpu_autorelease <- bool 
   let sync_cpu_to_gpu (R ((module R), r)) buf = R.BBuf.sync_cpu_to_gpu r buf
 
-  let pp ppf b = 
+  let pp ppf b =
     let gpu = if b.gpu_exists then (str "%d" b.gpu_count) else "none" in 
     let cpu = if b.cpu <> None then (str "%d" (cpu_count b)) else "none" in
     pp ppf "@[<1>(lit-buf %a @[<1>(cpu %s)@]@ @[<1>(gpu %s)@]@ %a)@]" 
       Ba.pp_scalar_type b.scalar_type cpu gpu pp_usage b.usage 
 
-  (* Renderer info *) 
+  (* Backend info *) 
 
   let binfo b = b.binfo 
   let set_binfo b i = b.binfo <- i
@@ -715,7 +716,7 @@ module Prim = struct
       p.name pp_kind p.kind pp_tr p.tr pp_first p.first (count_now p) 
       pp_index p.index pp_attrs (attrs p)
 
-  (* Renderer info *) 
+  (* Backend info *) 
 
   let binfo b = b.binfo 
   let set_binfo b i = b.binfo <- i
@@ -913,7 +914,7 @@ module Tex = struct
       Format.pp_print_bool t.mipmaps pp_min_filter t.min_filter 
       pp_mag_filter t.mag_filter pp_buf_opt t.buf
 
-  (* Renderer info *) 
+  (* Backend info *) 
 
   let binfo b = b.binfo 
   let set_binfo b i = b.binfo <- i
@@ -1104,11 +1105,10 @@ module Uniform = struct
   let pp_set ppf s = failwith "TODO"
 end
 
-
 (* Programs *) 
 
 module Prog = struct
-
+  
   include Prog_types 
 
   (* Source locations. *) 
@@ -1161,8 +1161,7 @@ module Prog = struct
 
   let stage s = s.stage
   let loc s = fst (List.hd s.srcs) 
-  let lang s = s.lang
-  
+  let lang s = s.lang               
   let source ?lang s =
     let lang = match lang with None -> s.lang | Some _ as lang -> lang in
     let version = match lang with
@@ -1193,7 +1192,7 @@ module Prog = struct
   let uniforms p = p.uset
   let shaders p = p.shaders
 
-  (* Renderer info *) 
+  (* Backend info *) 
 
   let binfo e = e.binfo 
   let set_binfo e i = e.binfo <- i
@@ -1204,7 +1203,6 @@ module View = struct
   include View_types 
 
   (* View and projection matrices *)
-
 
   type fov = [ `H of float | `V of float ]
 
@@ -1313,7 +1311,7 @@ module Effect = struct
   let depth e = e.depth
   let blend e = e.blend
   
-  (* Renderer info *) 
+  (* Backend info *) 
 
   let binfo e = e.binfo
   let set_binfo e i = e.binfo <- i
@@ -1322,8 +1320,7 @@ end
 module Fbuf = struct
 
   include Fbuf_types 
-
-  (** Render buffers. *) 
+    
   module Rbuf = struct
     include Rbuf_types
     
@@ -1365,6 +1362,7 @@ module Fbuf = struct
   let set_binfo f i = f.binfo <- i
 end
 
+(* Renderer *) 
 
 module Renderer = struct
   
@@ -1440,9 +1438,11 @@ module Renderer = struct
     (* Logs *) 
 
     let of_formatter ppf level msg = pp ppf "%a@." pp_msg msg 
+    let std = of_formatter Format.err_formatter
   end
 
   module Cap = struct
+
     include Cap_types 
 
     let shader_stages (R ((module R), r)) = (R.BCap.caps r).c_shader_stages
@@ -1508,8 +1508,7 @@ module Renderer = struct
               uniforms = Uniform.empty; tr = M4.id; 
               prim = Prim.create ~count:0 `Triangles [] }
     
-  let stdlog = Log.of_formatter Format.err_formatter 
-  let create ?compiler_msg_parser ?(log = stdlog) ?(debug = false) ~size 
+  let create ?compiler_msg_parser ?(log = Log.std) ?(debug = false) ~size 
       backend =
     let module R = (val backend : T) in
     let r = R.create ?compiler_msg_parser log ~debug size in
@@ -1519,9 +1518,9 @@ module Renderer = struct
   let set_size (R ((module R), r)) size = R.set_size r size
   let view (R ((module R), r)) = R.view r 
   let set_view (R ((module R), r)) v = R.set_view r v
-  let add_op (R ((module R), r)) op = if op != nop then R.add_op r op
   let fbuf (R ((module R), r)) = R.fbuf r
   let set_fbuf (R ((module R), r)) fbuf = R.set_fbuf r fbuf
+  let add_op (R ((module R), r)) op = if op != nop then R.add_op r op
   let render ?(clear = true) (R ((module R), r)) = R.render r ~clear
   let release (R ((module R), r)) = R.release r
 end

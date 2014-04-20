@@ -4,6 +4,8 @@
    %%NAME%% release %%VERSION%%
   ---------------------------------------------------------------------------*)
 
+open Gg
+
 (** Lightweight OpenGL-based rendering engine. 
 
     Lit is a lightweight OpenGL-based rendering engine for OCaml. It
@@ -24,9 +26,6 @@ type renderer
 (** The type for renderers. *)
 
 (** {1:base Buffers, primitive and textures}  *) 
-
-open Gg
-
 
 type buf 
 (** The type for buffers. *) 
@@ -589,7 +588,6 @@ end
 
 (** {1 GPU programs and parameters} *) 
 
-
 type 'a uniform 
 (** The type for program uniforms. *) 
 
@@ -756,8 +754,7 @@ end
     A GPU program is a set of linked {{!shaders}shaders}. Each shader defines 
     a transformation that is applied on the rendering pipeline that
     transforms the vertex stream to fragments. Programs can be 
-    shared among effects.
-*)
+    shared among effects. *)
 module Prog : sig
 
   (** {1:locs Source locations} 
@@ -867,7 +864,6 @@ v}
   val shaders : prog -> shader list
   (** [shaders p] is the shaders of [p]. *) 
 end
-
 
 (** Effects.
 
@@ -1007,7 +1003,6 @@ end
 
 (** {1 Rendering} *) 
 
-
 type view
 (** The type for rendered views. *)
 
@@ -1062,7 +1057,6 @@ module View : sig
   val viewport : view -> box2 
   val set_viewport : view -> box2 -> unit 
     
-
   (** {1 Coordinate system transforms} 
       
       TODO explain in detail coordinate systems *)
@@ -1116,8 +1110,7 @@ module View : sig
       The projection maps the symmetric frustum with top of the underlying
       pyramid at the origin, near clip rectangle corners
       [(-w/2,-h/2,-near)], [(w/2,h/2,-near)] and far plane at [-far]
-      to the axis aligned cube with corners [(-1, -1, -1)] and [(1,1,1)].
-  *) 
+      to the axis aligned cube with corners [(-1, -1, -1)] and [(1,1,1)]. *) 
 
   val look : ?up:v3 -> at:p3 -> from:p3 -> unit -> m4
   (** [look up at ~from:pos ()] in layman terms this is the transform
@@ -1194,7 +1187,8 @@ module Fbuf : sig
   (** The type for framebuffers. *) 
 
   val default : fbuf
-  (** [default] is the default framebuffer. *) 
+  (** [default] is the default framebuffer with {!clears_default}
+      clears. *)
   
   val create : ?clears:clears -> attachement list -> fbuf
   (** [create attachements] is a framebuffer with attachements [attachments]. *)
@@ -1372,13 +1366,13 @@ module Renderer : sig
 
   (** {1:ops Render operations} *) 
 
+  val nop : op 
+  (** [nop] is a render no-op, it has no effect on the renderer. *) 
+
   val op : ?count:int -> ?uniforms:Uniform.set -> ?tr:m4 -> effect -> prim -> op
   (** [op count uniforms tr e p] is a render op. [count] defaults to 1. 
       [uniforms] defaults to {!Uniform.empty}, [tr] to {!M4.id}. *)
     
-  val nop : op 
-  (** [nop] is a render no-op, it has no effect on the renderer. *) 
-
   val add_op : renderer -> op -> unit
   (** [add_op r o] adds render operation [o] on [r]. *) 
 
@@ -1388,7 +1382,7 @@ module Renderer : sig
   val set_size : renderer -> size2 -> unit
   val view : renderer -> View.t
   val set_view : renderer -> View.t -> unit
-
+    
   (** {1 Framebuffers} *) 
     
   val fbuf : renderer -> fbuf
@@ -1442,13 +1436,13 @@ module Renderer : sig
       val binfo : prim -> BInfo.t
       val set_binfo : prim -> BInfo.t -> unit
     end
-
+    
     module Tex : sig 
       include module type of Tex 
       val binfo : tex -> BInfo.t 
       val set_binfo : tex -> BInfo.t -> unit
     end
-
+    
     module Prog : sig 
       include module type of Prog with type shader = Prog.shader
       val binfo : prog -> BInfo.t
@@ -1549,12 +1543,9 @@ module Renderer : sig
       A valid OpenGL context is needed before calling this function. *)
 
   val release : renderer -> unit
-  (** [release r] releases GPU resources associated to the renderer. *) 
-
+  (** [release r] releases GPU resources associated to the renderer. *)
 end
   
-
-
 (*---------------------------------------------------------------------------
    Copyright (c) 2014 Daniel C. Bünzli.
    All rights reserved.
