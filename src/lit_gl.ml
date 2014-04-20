@@ -552,7 +552,7 @@ module BTex = struct
     let w = Float.int_of_round (Size3.w size) in 
     let h = Float.int_of_round (Size3.h size) in 
     let d = Float.int_of_round (Size3.d size) in
-    Gl.pixel_storei Gl.unpack_alignment 1; 
+    Gl.pixel_storei Gl.unpack_alignment 1;
     if buf_id <> 0 then Gl.bind_buffer Gl.pixel_unpack_buffer buf_id;
     Gl.bind_texture target id;
     begin match kind with
@@ -1254,13 +1254,10 @@ module BFbuf = struct
     let status = raw_status () in  
     Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf); status
 
-  let raw_read r fb rb box buf = 
-    let bid = BBuf.setup r buf in
-    let x = Float.int_of_round (Box2.ox box) in 
-    let y = Float.int_of_round (Box2.oy box) in 
-    let w = Float.int_of_round (Box2.w box) in 
-    let h = Float.int_of_round (Box2.h box) in
-    let st = BBuf.(enum_of_scalar_type (Buf.scalar_type buf)) in
+  let raw_read r fb rb box ~first ~w_stride buf = 
+    let st = Buf.scalar_type buf in
+    let first = first * (Ba.scalar_type_byte_count st) in 
+    let st = BBuf.enum_of_scalar_type st in
     let mode c = 
       if fb == Fbuf.default then Gl.back else
       Gl.color_attachment0 + c 
@@ -1279,15 +1276,23 @@ module BFbuf = struct
     | `Stencil ->
         Gl.read_buffer Gl.back; Gl.stencil_index, st                          
     in
+    let bid = BBuf.setup r buf in
+    let x = Float.int_of_round (Box2.ox box) in 
+    let y = Float.int_of_round (Box2.oy box) in 
+    let w = Float.int_of_round (Box2.w box) in 
+    let h = Float.int_of_round (Box2.h box) in
+    let row_length = match w_stride with None -> 0 | Some s -> s in
+    Gl.pixel_storei Gl.pack_alignment 1; 
+    Gl.pixel_storei Gl.pack_row_length row_length; 
     Gl.bind_buffer Gl.pixel_pack_buffer bid; 
-    Gl.read_pixels x y w h fmt st (`Offset 0);
+    Gl.read_pixels x y w h fmt st (`Offset first);
     Gl.bind_buffer Gl.pixel_pack_buffer 0
   
-  let read r fb rb box buf = 
-    if r.fbuf == fb then raw_read r fb rb box buf else
+  let read r fb rb box ~first ~w_stride buf = 
+    if r.fbuf == fb then raw_read r fb rb box ~first ~w_stride buf else
     let id = setup r fb in 
     Gl.bind_framebuffer Gl.framebuffer id; 
-    raw_read r fb rb box buf;
+    raw_read r fb rb box ~first ~w_stride buf;
     Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf)
 end
 
