@@ -11,7 +11,7 @@ open Gg
 let write_header oc size typ = 
   let w = Float.int_of_round (Size2.w size) in 
   let h = Float.int_of_round (Size2.h size) in 
-  let typ, psize = match typ with 
+  let typ, psize = match typ with
   | `Color_rgb -> 2, 24
   | `Color_rgba -> 2, 32
   | `Gray -> 3, 8
@@ -49,7 +49,7 @@ let write_rgba oc ba =
 
 let write_gray oc ba = 
   for k = 0 to Ba.length ba - 1 do
-    output_byte oc ba.{k}; 
+    output_byte oc (255 - ba.{k}); 
   done
 
 let write fname typ size ba = 

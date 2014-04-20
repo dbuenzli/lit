@@ -86,6 +86,8 @@ module Buf_types = struct
       mutable cpu_autorelease : bool;
       mutable cpu : bigarray_any option; 
       mutable info : Info.t; }
+
+  type access = [ `R | `W | `RW ]
 end
 
 type buf = Buf_types.t
@@ -372,7 +374,7 @@ type op =
 
 
 module Renderer_types = struct
-  
+ 
   type clears = 
     { clear_color : color option; 
       clear_depth : float option; 
@@ -380,10 +382,20 @@ module Renderer_types = struct
 
   module type T = sig
     type t 
+      
+    module BBuf : sig 
+      val sync_cpu_to_gpu : t -> buf -> unit
+      val sync_gpu_to_cpu : t -> buf -> unit
+      val gpu_map : t -> [ `R | `W | `RW ]  -> buf -> 
+        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
+      val gpu_unmap : t -> buf -> unit
+    end
+
     val name : string
     val create : 
       ?compiler_msg_parser:Log_types.compiler_msg_parser -> Log_types.t ->
       debug:bool -> size2 -> t
+
     val size : t -> size2
     val set_size : t -> size2 -> unit
     val view : t -> view
@@ -395,7 +407,8 @@ module Renderer_types = struct
     val add_op : t -> op -> unit
     val render : t -> clear:bool -> unit
     val release : t -> unit
-      
+
+
     module Cap : sig
       val shader_kinds : t -> Prog_types.shader_kind list
       val gl_version : t ->
@@ -408,8 +421,7 @@ module Renderer_types = struct
       type caps =
         { c_max_samples : int;
           c_max_tex_size : int;
-          c_max_render_buffer_size : int; }
-        
+          c_max_render_buffer_size : int; }        
       val caps : t -> caps 
     end
 
@@ -438,22 +450,10 @@ module Renderer_types = struct
         | `Undefined
         | `Unsupported ]
     end
-
-    module Buf : sig
-      val sync_cpu_to_gpu : t -> buf -> unit
-      val sync_gpu_to_cpu : t -> buf -> unit
-      val map : t -> [ `R | `W | `RW ]  -> buf -> 
-        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
-      val unmap : t -> buf -> unit
-    end
   end
-
-  
-  type t = R : (module T with type t = 'a) * 'a -> t
 end
 
-type renderer = Renderer_types.t
-
+type renderer = R : (module Renderer_types.T with type t = 'a) * 'a -> renderer
 
 (* Buffers *) 
 
@@ -519,6 +519,8 @@ module Buf = struct
   let usage b = b.usage 
   let scalar_type b = b.scalar_type
 
+  (* GPU *) 
+  
   let gpu_count b = b.gpu_count 
   let gpu_byte_count b = b.gpu_count * (Ba.scalar_type_byte_count b.scalar_type)
   let set_gpu_count b count = b.gpu_count <- count 
@@ -526,6 +528,11 @@ module Buf = struct
   let set_gpu_exists b e = b.gpu_exists <- e
   let gpu_upload b = b.gpu_upload
   let set_gpu_upload b u = b.gpu_upload <- u
+  let sync_gpu_to_cpu (R ((module R), r)) buf = R.BBuf.sync_gpu_to_cpu r buf
+  let gpu_map (R ((module R), r)) m buf k = R.BBuf.gpu_map r m buf k 
+  let gpu_unmap (R ((module R), r)) buf = R.BBuf.gpu_unmap r buf
+
+  (* CPU *) 
 
   let cpu_count b = match b.cpu with 
   | None -> 0 | Some (Ba ba) -> Ba.length ba
@@ -534,7 +541,6 @@ module Buf = struct
   let cpu_byte_count b = match b.cpu with 
   | None -> 0 
   | Some (Ba ba) -> Ba.length ba * (Ba.scalar_type_byte_count b.scalar_type)
-
 
   let check_ba_scalar_type b exp =
     let st = Ba.scalar_type_of_ba_scalar_type exp in 
@@ -551,9 +557,6 @@ module Buf = struct
   let get_cpu b st = match cpu b st with 
   | None -> invalid_arg err_no_cpu_buffer
   | Some cpu -> cpu 
-
-  let cpu_p b = b.cpu
-  let set_cpu_p b cpu = b.cpu <- Some cpu
 
   let check_kind b k =
     let open Bigarray in
@@ -574,10 +577,14 @@ module Buf = struct
   let set_cpu b = function 
   | None -> b.cpu <- None
   | Some ba -> check_kind b (Bigarray.Array1.kind ba); b.cpu <- Some (Ba ba)
- 
+
+  let cpu_p b = b.cpu
+  let set_cpu_p b cpu = b.cpu <- Some cpu 
   let cpu_autorelease b = b.cpu_autorelease
   let set_cpu_autorelease b bool = b.cpu_autorelease <- bool
       
+  let sync_cpu_to_gpu (R ((module R), r)) buf = R.BBuf.sync_cpu_to_gpu r buf
+
   let pp ppf b = 
     let gpu = if b.gpu_exists then (str "%d" b.gpu_count) else "none" in 
     let cpu = if b.cpu <> None then (str "%d" (cpu_count b)) else "none" in
@@ -1344,6 +1351,8 @@ end
 module Renderer = struct
   include Renderer_types 
 
+  type t = renderer
+  
   module Log = struct
 
     include Log_types 
@@ -1505,14 +1514,6 @@ module Renderer = struct
     module Effect = Effect
     module Fbuf = Fbuf
     module Log = Log
-  end
-
-  module Buf = struct
-    let sync_cpu_to_gpu (R ((module R), r)) buf = R.Buf.sync_cpu_to_gpu r buf
-    let sync_gpu_to_cpu (R ((module R), r)) buf = R.Buf.sync_gpu_to_cpu r buf
-    type access = [ `R | `W | `RW ]
-    let map (R ((module R), r)) m buf k = R.Buf.map r m buf k 
-    let unmap (R ((module R), r)) buf = R.Buf.unmap r buf
   end
 
   module Fbuf = struct

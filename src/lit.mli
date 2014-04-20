@@ -18,9 +18,15 @@
 
     {e Release %%VERSION%% — %%MAINTAINER%% } *) 
 
+(** {1:rtype Renderer} *) 
+
+type renderer 
+(** The type for renderers. *)
+
 (** {1:bufs Buffers}  *) 
 
 open Gg
+
 
 type buf 
 (** The type for buffers. *) 
@@ -29,9 +35,7 @@ type buf
 
     Buffers are linear arrays of scalars of a given {{!Gg.Ba.scalar_type}scalar
     type}. At a given point in time the scalars may exist only on the
-    CPU side, only on the GPU side or on both sides (synchronized or not).
-
-    Some functions on buffers need a renderer, see {!Renderer.Buf}. *)
+    CPU side, only on the GPU side or on both sides (synchronized or not). *)
 module Buf : sig
   
   (** {1 Buffer usage} *) 
@@ -77,22 +81,21 @@ module Buf : sig
  
   val create : ?cpu_autorelease:bool ->
     ?usage:usage -> ('a, 'b) init -> buf
-   (** [create unsigned cpu_autorelease usage init] is a buffer value such that:
+   (** [create cpu_autorelease usage init] is a buffer value such that:
        {ul
-       {- [init] is the buffer initialisation, see {!init}. Note that 
-          for [`Cpu] and [`Cpu_bigarray] initialisation, {!gpu_upload}
-          is [true] on the resulting buffer.}
+       {- [init] is the buffer initialisation, see {!init}.}
        {- [usage], hint specifiying the buffer usage, see {!usage} 
           (defaults to [`Static_draw]).}
        {- [cpu_autorelease], if [true] (default) the CPU buffer is
           automatically released by {{!set_cpu_}setting} it to [None] once 
           it is uploaded to the GPU buffer.}}
 
-       Note that while CPU and GPU buffer length may change, their scalar 
-       type is immutable.
-       
-       @raise Invalid_argument if the bigarray in [`Cpu_bigarray] cannot
-       be converted to a {{!type:scalar_type}scalar_type}. *) 
+       Note that while CPU and GPU buffer length may change, their
+       scalar type is immutable.  
+
+       At creation time {!gpu_upload} is [true] this means that
+       the GPU buffer will be automatically created the first time the
+       buffer is used. *)
 
   val usage : buf -> usage
   (** [usage b] is the usage of [b]. *) 
@@ -122,46 +125,82 @@ module Buf : sig
       {b Warning} If {!cpu} is [None] at the time of upload this will zero 
       any existing data on the GPU buffer. *) 
 
-  (** {1 CPU buffer} *) 
+  val sync_gpu_to_cpu : renderer -> buf -> unit
+  (** [gpu_to_cpu r b] reads back [b]'s GPU buffer into [b]'s CPU
+      buffer. A CPU buffer is created in none existed yet or if the
+      size of the CPU buffer is different from the size of the GPU
+      buffer.
 
+      @raise Invalid_argument if {!Buf.gpu_exists} is [false]. *)
+
+  (** {2 Mapping the GPU buffer in CPU} *) 
+    
+  val gpu_map : renderer -> [ `R | `W | `RW ] -> buf -> 
+    ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
+  (** [gpu_map r access b st] maps the GPU buffer of [b] with 
+      access [access].
+      
+      {b Warning.} A mapped buffer cannot be used in a render
+      operation, you need to {!unmap} it first. Once unmapped the
+      bigarray becomes invalid. Don't try to access it, it may result
+      in program termination.
+
+      @raise Invalid_argument if [st] does not match [buf]'s
+      scalar type. *)
+
+  val gpu_unmap : renderer -> buf -> unit
+  (** [gpu_unmap r b] unmaps the buffer [b]. 
+      
+      {b Warning.} This invalidates the memory pointed to 
+      by the bigarray returned by {!map}, do not try to 
+      access it after this function has been called it may
+      result in program termination. *)
+
+  (** {1 CPU buffer} *) 
+      
   val cpu_count : buf -> int
   (** [cpu_count b] is the number of scalars in the CPU buffer of [b]. *)
-
+    
   val cpu_exists : buf -> bool 
   (** [cpu_exists b] is [true] if the CPU buffer of [b] exists. *) 
-
+    
   val cpu : buf -> ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray option
   (** [cpu b st] is the CPU buffer of [b] (if any).
       
       {b Note.} If you want changes you made to the buffer to be picked 
       up by the GPU side buffer you must call {!set_gpu_upload}.
-
+      
       @raise Invalid_argument if scalar type [st] is not the 
       scalar type of [b]. *)
-
+      
   val get_cpu : buf -> ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
   (** [get_cpu b st] is [cpu b st] but raises if there's no 
       cpu buffer.
-
+      
       @raise Invalid_argument if [cpu b st] raises or if 
       [cpu_exists b] is [false]. *) 
-
+      
   val set_cpu : buf -> ('a, 'b) bigarray option -> unit
   (** [set_cpu b ba] sets the CPU buffer of [b] to [ba]. 
-
+      
       {b Note.} If you want changes to the scalars to be picked 
       up by the GPU side buffer you must call {!set_gpu_upload}.
-
+      
       @raise Invalid_argument if the bigarray kind of [b] is not compatible
       with the scalar type of [b]. *) 
-
+    
   val cpu_autorelease : buf -> bool 
   (** [cpu_autorelease buf] is [true] if the CPU buffer is set to [None]
       once uploaded to the GPU. *)
-
+    
   val set_cpu_autorelease : buf -> bool -> unit
   (** [set_cpu_autorelease b bool] sets the autorelease behaviour to [bool]. *)
-
+    
+  val sync_cpu_to_gpu : renderer -> buf -> unit 
+  (** [sync_cpu_to_gpu r b] uploads the CPU buffer of [b] to the GPU buffer. 
+      A GPU buffer is created if none existed yet. 
+      
+      @raise Invalid_argument if {!Buf.cpu_exists} is [false]. *)  
 end
 
 (** {1:prims Primitives} *) 
@@ -1145,9 +1184,6 @@ module Fbuf : sig
   (** [attachements f] is [f]'s attachements. *) 
 end
 
-type renderer 
-(** The type for renderers. *)
-
 type op = 
   { count : int; effect : effect; uniforms : Uniform.set; tr : m4; prim : prim }
 (** The type for render operations. *) 
@@ -1418,51 +1454,6 @@ module Renderer : sig
     val max_render_buffer_size : renderer -> int
   end
 
-  (** Renderer specific buffer functions. *)
-  module Buf : sig
-
-    (** {1 Buffer synchronisation} 
-
-        {b Note} These functions may block. *)
-
-    val sync_cpu_to_gpu : renderer -> buf -> unit 
-    (** [sync_cpu_to_gpu r b] uploads the CPU buffer of [b] to the GPU buffer. 
-        A GPU buffer is created if none existed yet. 
-        
-        @raise Invalid_argument if {!Buf.cpu_exists} is [false]. *)
-  
-    val sync_gpu_to_cpu : renderer -> buf -> unit
-    (** [gpu_to_cpu r b] reads back [b]'s GPU buffer into [b]'s 
-        CPU buffer. A CPU buffer is created in none existed yet or if 
-        the size of the CPU buffer is different from the size of the
-        GPU buffer.
-
-        @raise Invalid_argument if {!Buf.gpu_exists} is [false]. *)
-
-    (** {1 Mapping GPU buffers in CPU} *) 
-
-    val map : renderer -> [ `R | `W | `RW ] -> Buf.t 
-      -> ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
-    (** [map r access b st] maps the GPU buffer of [b] with 
-        access [access].
-
-        {b Warning.} A mapped buffer cannot be used in a render
-        operation, you need to {!unmap} it first. Once unmapped the
-        bigarray becomes invalid. Don't try to access it, it may result
-        in program termination.
-
-        @raise Invalid_argument if [st] does not match [buf]'s
-        scalar type. *)
-
-    val unmap : renderer -> buf -> unit
-    (** [unmap r b] unmaps the buffer [b]. 
-
-        {b Warning.} This invalidates the memory pointed to 
-        by the bigarray returned by {!map}, do not try to 
-        access it after this function has been called it may
-        result in program termination. *)
-  end
-
  
   (** {1 Framebuffer clearing.} 
       
@@ -1490,6 +1481,15 @@ module Renderer : sig
   (** The type for a renderer backend. *) 
   module type T = sig
     type t 
+
+    module BBuf : sig 
+      val sync_cpu_to_gpu : t -> buf -> unit
+      val sync_gpu_to_cpu : t -> buf -> unit
+      val gpu_map : t -> [ `R | `W | `RW ]  -> buf -> 
+        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
+      val gpu_unmap : t -> buf -> unit
+    end
+
     val name : string
     val create : 
       ?compiler_msg_parser:Log.compiler_msg_parser -> Log.t -> debug:bool -> 
@@ -1548,14 +1548,6 @@ module Renderer : sig
         | `Undefined
         | `Unsupported ]      
     end 
-
-    module Buf : sig
-      val sync_cpu_to_gpu : t -> buf -> unit
-      val sync_gpu_to_cpu : t -> buf -> unit
-      val map : t -> [ `R | `W | `RW ]  -> buf -> 
-        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
-      val unmap : t -> buf -> unit
-    end
   end
 
   (** {1:renderers Renderers} *)

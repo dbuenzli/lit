@@ -15,6 +15,7 @@ module Imap = Map.Make (Id)
 module Info = Renderer.Private.Info
 module Attr = Renderer.Private.Attr
 module Log = Renderer.Private.Log 
+module Buf = Renderer.Private.Buf
 
 module Smap = Map.Make (String)
 
@@ -175,10 +176,9 @@ module Cap = struct
         Gl_hi.get_int (Gl.get_integerv Gl.max_renderbuffer_size); }
 end
 
-(* Bufs *) 
+(* Backend buffers  *) 
 
-module Buf = struct
-  include Renderer.Private.Buf
+module BBuf = struct
 
   let enum_of_scalar_type = function 
   | `Int8 -> Gl.byte
@@ -214,9 +214,9 @@ module Buf = struct
       scalar_type : Gl.enum;           (* Buffer scalar type *) }
 
   let inject, project = Info.create () 
-  let info b = project (info b)
+  let info b = project (Buf.info b)
   let get_info b = match info b with None -> assert false | Some i -> i
-  let set_info b (i : info) = set_info b (inject i)
+  let set_info b (i : info) = Buf.set_info b (inject i)
 
   let finalise_info i =
     Gl_hi.delete_buffer i.id
@@ -239,17 +239,17 @@ module Buf = struct
     let usage = enum_of_usage (Buf.usage b) in
     Gl.bind_buffer Gl.array_buffer id; 
     Gl.buffer_data Gl.array_buffer 0 None usage; (* mark buffer as unused. *) 
-    begin match cpu_p b with 
+    begin match Buf.cpu_p b with 
     | None -> 
-        let byte_count = gpu_byte_count b in
+        let byte_count = Buf.gpu_byte_count b in
         Gl.buffer_data Gl.array_buffer byte_count None usage
-    | Some (Ba ba) -> 
-        let byte_count = cpu_byte_count b in
+    | Some (Buf.Ba ba) -> 
+        let byte_count = Buf.cpu_byte_count b in
         Gl.buffer_data Gl.array_buffer byte_count (Some ba) usage;
-        set_gpu_count b (Buf.cpu_count b);
+        Buf.set_gpu_count b (Buf.cpu_count b);
     end;
     Gl.bind_buffer Gl.array_buffer 0; 
-    set_gpu_exists b true;
+    Buf.set_gpu_exists b true;
     Buf.set_gpu_upload b false;
     if Buf.cpu_autorelease b then Buf.set_cpu b None; 
     id
@@ -262,13 +262,13 @@ module Buf = struct
   let sync_gpu_to_cpu r b = 
     if not (Buf.gpu_exists b) then invalid_arg "no gpu buffer" else 
     let info = get_info b in
-    let gpu_count = Buf.gpu_count b in
-    if Buf.cpu_count b <> gpu_count 
-    then set_cpu_p b (create_bigarray_any (Buf.scalar_type b) gpu_count);
-    match cpu_p b with 
+    let gpu_kount = Buf.gpu_count b in
+    if Buf.cpu_count b <> gpu_kount 
+    then Buf.(set_cpu_p b (create_bigarray_any (scalar_type b) gpu_kount));
+    match Buf.cpu_p b with 
     | None -> assert false 
-    | Some (Ba ba) ->
-        let byte_count = cpu_byte_count b in
+    | Some (Buf.Ba ba) ->
+        let byte_count = Buf.cpu_byte_count b in
         Gl.bind_buffer Gl.array_buffer info.id;
         Gl.get_buffer_sub_data Gl.array_buffer 0 byte_count ba;
         Gl.bind_buffer Gl.array_buffer 0
@@ -279,9 +279,9 @@ module Buf = struct
      on the returned big array in info, and set its length to 
      zero once we unmap (would need to do it in C I guess).  *)
 
-  let map r access b st = 
+  let gpu_map r access b st = 
     let id = setup r b in 
-    check_ba_scalar_type b st;
+    Buf.check_ba_scalar_type b st;
     let kind = Ba.ba_kind_of_ba_scalar_type st in
     let access = enum_of_access access in
     let count = Buf.gpu_count b in
@@ -290,7 +290,7 @@ module Buf = struct
     Gl.bind_buffer Gl.array_buffer 0;
     ba
 
-  let unmap r b = 
+  let gpu_unmap r b = 
     let id = setup r b in 
     Gl.bind_buffer Gl.array_buffer id;
     ignore (Gl.unmap_buffer Gl.array_buffer); 
@@ -338,20 +338,20 @@ module Prim = struct
 
   let setup r p = match info p with 
   | Some _ -> 
-      let update_attr a = ignore (Buf.setup r (Attr.buf a)) in
+      let update_attr a = ignore (BBuf.setup r (Attr.buf a)) in
       Prim.iter update_attr p; 
       begin match index p with 
       | None -> () 
-      | Some b -> ignore (Buf.setup r b)
+      | Some b -> ignore (BBuf.setup r b)
       end
   | None -> 
       let id = Gl_hi.gen_vertex_array () in
       let info = setup_info r p id in
       let index_id = match index p with 
       | None -> 0 
-      | Some index -> Buf.setup r index
+      | Some index -> BBuf.setup r index
       in
-      Prim.iter (fun a -> ignore (Buf.setup r (Attr.buf a))) p;
+      Prim.iter (fun a -> ignore (BBuf.setup r (Attr.buf a))) p;
       Gl.bind_vertex_array info.id;
       Gl.bind_buffer Gl.element_array_buffer index_id;
       (* attrs are bound later, see Prog.bind_prim *) 
@@ -502,7 +502,7 @@ module Tex = struct
     if not (Tex.gpu_update t) then id else
     let buf_id = match Tex.buf t with 
     | None -> 0 
-    | Some b -> Buf.setup r b
+    | Some b -> BBuf.setup r b
     in
     let kind = Tex.kind t in
     let target = target_enum_of_kind kind in
@@ -979,10 +979,10 @@ module Prog = struct
                 (* TODO on debug we could try to match attr_info.a_type with 
                    attr's type. *) 
                 let buf = Attr.buf attr in
-                let buf_info = Buf.get_info buf in
+                let buf_info = BBuf.get_info buf in
                 let loc = attr_info.a_loc in
                 let dim = Attr.dim attr in
-                let scalar_type = buf_info.Buf.scalar_type in
+                let scalar_type = buf_info.BBuf.scalar_type in
                 let n = Attr.normalize attr in 
                 let bytes = Ba.scalar_type_byte_count (Buf.scalar_type buf) in
                 let stride = Attr.stride attr * bytes in 
@@ -991,7 +991,7 @@ module Prog = struct
                 | `UInt32 _ | `Int32 _ -> true 
                 | `Unsupported _ | `Float32 _ -> false
                 in
-                Gl.bind_buffer Gl.array_buffer buf_info.Buf.id; 
+                Gl.bind_buffer Gl.array_buffer buf_info.BBuf.id; 
                 Gl.enable_vertex_attrib_array loc; 
                 if int_attr 
                 then Gl.vertex_attrib_ipointer loc dim scalar_type stride first
@@ -1213,12 +1213,12 @@ module Fbuf = struct
 
   let async_read r fbuf rb ~pos ~size buf = 
     let fid = setup r fbuf in 
-    let bid = Buf.setup r buf in
+    let bid = BBuf.setup r buf in
     let x = Float.int_of_round (V2.x pos) in 
     let y = Float.int_of_round (V2.y pos) in 
     let w = Float.int_of_round (Size2.w size) in 
     let h = Float.int_of_round (Size2.h size) in
-    let st = Buf.(enum_of_scalar_type (scalar_type buf)) in
+    let st = BBuf.(enum_of_scalar_type (Buf.scalar_type buf)) in
     let mode c = 
       if fbuf == Fbuf.default then Gl.back else
       Gl.color_attachment0 + c 
@@ -1301,11 +1301,11 @@ let render_op r prog_info op =
       else Gl.draw_arrays_instanced mode first count op.count
   | Some index ->
       let prim_info = Prim.get_info op.prim in 
-      let index_info = Buf.get_info index in
+      let index_info = BBuf.get_info index in
       let first = `Offset (Prim.first op.prim) in 
       let count = Prim.count_now op.prim in 
       let mode = prim_info.Prim.kind in
-      let type_ = index_info.Buf.scalar_type in
+      let type_ = index_info.BBuf.scalar_type in
       if op.count = 1
       then Gl.draw_elements mode count type_ first
       else Gl.draw_elements_instanced mode count type_ first op.count
