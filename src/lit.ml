@@ -342,6 +342,27 @@ module Fbuf_types = struct
     | `Depth_stencil of image ]
     
   type t = { attachements : attachement list; mutable binfo : BInfo.t }
+
+  type status = 
+    [ `Complete
+    | `Incomplete_attachement
+    | `Incomplete_draw_buffer
+    | `Incomplete_layer_targets
+    | `Incomplete_missing_attachement
+    | `Incomplete_multisample
+    | `Incomplete_read_buffer
+    | `Undefined
+    | `Unsupported ]      
+
+  type read = 
+    [ `Color_r of int 
+    | `Color_g of int 
+    | `Color_b of int 
+    | `Color_rgb of int 
+    | `Color_rgba of int
+    | `Depth
+    | `Stencil 
+    | `Depth_stencil ]
 end
 
 type fbuf = Fbuf_types.t
@@ -396,6 +417,10 @@ module Renderer_types = struct
     
   module type T = sig
     type t 
+
+    module BCap : sig
+      val caps : t -> Cap_types.t 
+    end
       
     module BBuf : sig 
       val sync_cpu_to_gpu : t -> buf -> unit
@@ -405,8 +430,10 @@ module Renderer_types = struct
       val gpu_unmap : t -> buf -> unit
     end
 
-    module BCap : sig
-      val caps : t -> Cap_types.t 
+    module BFbuf : sig        
+      val status : t -> fbuf -> Fbuf_types.status
+      val read : t -> fbuf -> Fbuf_types.read -> pos:p2 -> size:size2 -> 
+        buf -> unit
     end
 
     val name : string
@@ -425,32 +452,6 @@ module Renderer_types = struct
     val add_op : t -> op -> unit
     val render : t -> clear:bool -> unit
     val release : t -> unit
-
-    module Fbuf : sig 
-      type read_buf = 
-        [ `Color_r of int 
-        | `Color_g of int 
-        | `Color_b of int 
-        | `Color_rgb of int 
-        | `Color_rgba of int
-        | `Depth
-        | `Stencil 
-        | `Depth_stencil ]
-        
-      val async_read : t -> fbuf -> read_buf -> pos:p2 -> size:size2 -> 
-        buf -> unit
-
-      val complete : t -> fbuf -> 
-        [ `Complete
-        | `Incomplete_attachement
-        | `Incomplete_draw_buffer
-        | `Incomplete_layer_targets
-        | `Incomplete_missing_attachement
-        | `Incomplete_multisample
-        | `Incomplete_read_buffer
-        | `Undefined
-        | `Unsupported ]
-    end
   end
 end
 
@@ -1325,6 +1326,8 @@ end
 
 module Fbuf = struct
 
+  include Fbuf_types 
+
   (** Render buffers. *) 
   module Rbuf = struct
     include Rbuf_types
@@ -1338,12 +1341,18 @@ module Fbuf = struct
     let binfo b = b.binfo
     let set_binfo b i = b.binfo <- i
   end
-
-  include Fbuf_types 
   
   let default = { attachements = []; binfo = BInfo.none }
   let create attachements = { attachements; binfo = BInfo.none }
   let attachements f = f.attachements
+
+  let status (R ((module R), r)) fb = R.BFbuf.status r fb
+        
+  let read (R ((module R), r)) fb read ~pos ~size buf = 
+    R.BFbuf.read r fb read ~pos ~size buf
+        
+  (* Backend info *) 
+
   let binfo f = f.binfo
   let set_binfo f i = f.binfo <- i
 end
@@ -1516,25 +1525,6 @@ module Renderer = struct
   let set_fbuf (R ((module R), r)) fbuf = R.set_fbuf r fbuf
   let render ?(clear = true) (R ((module R), r)) = R.render r ~clear
   let release (R ((module R), r)) = R.release r
-
-
-
-  module Fbuf = struct
-      type read_buf = 
-        [ `Color_r of int 
-        | `Color_g of int 
-        | `Color_b of int 
-        | `Color_rgb of int 
-        | `Color_rgba of int
-        | `Depth
-        | `Stencil 
-        | `Depth_stencil ]
-        
-    let async_read (R ((module R), r)) fbuf rb ~pos ~size buf = 
-      R.Fbuf.async_read r fbuf rb ~pos ~size buf
-        
-    let complete (R ((module R), r)) fbuf = R.Fbuf.complete r fbuf
-  end
 end
 
 (*---------------------------------------------------------------------------

@@ -76,7 +76,7 @@ let dump r app =
   let fmt = Raster.Sample.(format rgb_l `UInt8) in
   let scalar_count = Raster.Sample.scalar_count ~w ~h fmt in
   let buf = Buf.create (`Gpu (`UInt8, scalar_count)) in 
-  Renderer.Fbuf.async_read r Fbuf.default (`Color_rgb 0) ~pos ~size buf; 
+  Fbuf.read r Fbuf.default (`Color_rgb 0) ~pos ~size buf; 
   let ba = Buf.gpu_map r `R buf Ba.UInt8 in
   let fname = "/tmp/out.tga" in
   begin match Tga.write fname `Color_rgb size ba with 

@@ -1098,17 +1098,16 @@ module BEffect = struct
     ()
 end
 
-module Fbuf = struct
+module BFbuf = struct
 
   module Rbuf_impl = struct 
-    include Renderer.Private.Fbuf.Rbuf
 
     type binfo = { id : Id.t; }    (* Associated GL render buffer object id. *) 
       
     let inject, project = BInfo.create () 
-    let binfo b = project (binfo b)
+    let binfo b = project (Fbuf.Rbuf.binfo b)
     let get_binfo b = match binfo b with None -> assert false | Some i -> i
-    let set_binfo b (i : binfo) = set_binfo b (inject i)
+    let set_binfo b (i : binfo) = Fbuf.Rbuf.set_binfo b (inject i)
 
     let finalise_binfo i =
       Gl_hi.delete_render_buffer i.id
@@ -1124,23 +1123,21 @@ module Fbuf = struct
     | None -> 
         let id = Gl_hi.gen_render_buffer () in
         let _ = setup_binfo r b id in
-        let w = Float.int_of_round (Size2.w (size2 b)) in 
-        let h = Float.int_of_round (Size2.h (size2 b)) in 
-        let f = BTex.internal_format_enum_of_format (sample_format b) in
-        let m = match multisample b with None -> 0 | Some m -> m in
+        let w = Float.int_of_round (Size2.w (Fbuf.Rbuf.size2 b)) in 
+        let h = Float.int_of_round (Size2.h (Fbuf.Rbuf.size2 b)) in 
+        let sf = Fbuf.Rbuf.sample_format b in
+        let f = BTex.internal_format_enum_of_format sf in
+        let m = match Fbuf.Rbuf.multisample b with None -> 0 | Some m -> m in
         Gl.bind_renderbuffer Gl.renderbuffer id;
         Gl.renderbuffer_storage_multisample Gl.renderbuffer m f w h; 
         id
-
   end
-
-  include Renderer.Private.Fbuf 
 
   type binfo = { id : Id.t; }         (* Associated GL framebuffer object id. *)
   let inject, project = BInfo.create () 
-  let binfo b = project (binfo b)
+  let binfo b = project (Fbuf.binfo b)
   let get_binfo b = match binfo b with None -> assert false | Some i -> i
-  let set_binfo b (i : binfo) = set_binfo b (inject i)
+  let set_binfo b (i : binfo) = Fbuf.set_binfo b (inject i)
 
   let finalise_binfo i =
     Gl_hi.delete_framebuffer i.id
@@ -1177,7 +1174,7 @@ module Fbuf = struct
         let id = Gl_hi.gen_framebuffer () in
         let _ = setup_binfo r f id in
         Gl.bind_framebuffer Gl.framebuffer id;
-        List.iter (attach r) (attachements f);
+        List.iter (attach r) (Fbuf.attachements f);
         id
 
   let status_enum_to_variant = 
@@ -1192,24 +1189,14 @@ module Fbuf = struct
       Gl.framebuffer_incomplete_multisample, `Incomplete_multisample; 
       Gl.framebuffer_incomplete_layer_targets, `Incomplete_layer_targets; ]
 
-  let complete r fbuf = 
+  let status r fbuf = 
     let id = setup r fbuf in 
     Gl.bind_framebuffer Gl.framebuffer id; 
     let s = Gl.check_framebuffer_status Gl.framebuffer in 
     Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf);
     try List.assoc s status_enum_to_variant with Not_found -> failwith "TODO"
 
-  type read_buf = 
-    [ `Color_r of int
-    | `Color_g of int
-    | `Color_b of int
-    | `Color_rgb of int
-    | `Color_rgba of int
-    | `Depth
-    | `Depth_stencil
-    | `Stencil ] 
-
-  let async_read r fbuf rb ~pos ~size buf = 
+  let read r fbuf rb ~pos ~size buf = 
     let fid = setup r fbuf in 
     let bid = BBuf.setup r buf in
     let x = Float.int_of_round (V2.x pos) in 
@@ -1364,7 +1351,7 @@ let add_op r op =  match BProg.setup r (Effect.prog op.effect) with
       
 let fbuf r = r.fbuf
 let set_fbuf r fbuf =
-  let id = Fbuf.setup r fbuf in 
+  let id = BFbuf.setup r fbuf in 
   Gl.bind_framebuffer Gl.framebuffer id; 
   r.fbuf <- fbuf
   

@@ -156,7 +156,7 @@ let fbuf = ref Fbuf.default
 let draw r = 
   let op = Renderer.op effect ~tr:(M4.of_quat !prim_tr) !prim in
   Renderer.set_fbuf r !fbuf;
-  assert(Renderer.Fbuf.complete r !fbuf = `Complete);
+  assert(Fbuf.status r !fbuf = `Complete);
   Renderer.add_op r op;
   Renderer.render r; 
   let op = Renderer.op ~uniforms:!fs_uniforms fullscreen_effect fullscreen in
@@ -184,7 +184,7 @@ let resize r size =
     in 
     let depth = Fbuf.Rbuf.create ~multisample:scount size (`Depth `UInt24) in
     let fbuf = Fbuf.create [`Color (0, `Tex (0, color)); `Depth (`Rbuf depth)]in
-    assert(Renderer.Fbuf.complete r fbuf = `Complete); 
+    assert(Fbuf.status r fbuf = `Complete); 
     fbuf, color
   in
   fbuf := new_fb;

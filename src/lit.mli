@@ -23,13 +23,22 @@
 type renderer 
 (** The type for renderers. *)
 
-(** {1:bufs Buffers}  *) 
+(** {1:base Buffers, primitive and textures}  *) 
 
 open Gg
 
 
 type buf 
 (** The type for buffers. *) 
+
+type attr
+(** The type for vertex stream attributes. *) 
+
+type prim
+(** The type for primitives. *)
+
+type tex 
+(** The type for textures. *) 
 
 (** Buffers.
 
@@ -203,14 +212,6 @@ module Buf : sig
       @raise Invalid_argument if {!Buf.cpu_exists} is [false]. *)  
 end
 
-(** {1:prims Primitives} *) 
-
-type attr
-(** The type for vertex stream attributes. *) 
-
-type prim
-(** The type for primitives. *)
-
 (** Attributes. 
 
     An attribute is part of the vertex stream sent to the GPU by a
@@ -291,7 +292,7 @@ module Attr : sig
       @raise Invalid_argument if [n] is negative. *)
 end
 
-(** Primitives 
+(** Primitives.
 
     A primitive defines a vertex stream (set of {{!Attr}attributes}) sent to
     the GPU and how this stream must be interpreted as geometrical
@@ -409,20 +410,6 @@ module Prim : sig
   (** [get p n] is the attribute named [n] of [p]. 
       @raise Invalid_argument if there is no attribute named [n] in p. *)
 end
-
-(** {1 GPU programs and parameters} *) 
-
-type tex 
-(** The type for textures. *) 
-
-type 'a uniform 
-(** The type for program uniforms. *) 
-
-type prog 
-(** The type for programs. *) 
-
-type effect 
-(** The type for effects. *) 
 
 (** Textures. 
 
@@ -599,6 +586,18 @@ module Tex : sig
   (** [pp ppf t] is a textual represenation of [t] on [ppf]. *) 
 
 end
+
+(** {1 GPU programs and parameters} *) 
+
+
+type 'a uniform 
+(** The type for program uniforms. *) 
+
+type prog 
+(** The type for programs. *) 
+
+type effect 
+(** The type for effects. *) 
 
 (** Uniforms. *) 
 module Uniform : sig
@@ -1182,6 +1181,45 @@ module Fbuf : sig
 
   val attachements : fbuf -> attachement list 
   (** [attachements f] is [f]'s attachements. *) 
+      
+  (** {1 Framebuffer status} *) 
+
+  type status = 
+    [ `Complete
+    | `Incomplete_attachement
+    | `Incomplete_draw_buffer
+    | `Incomplete_layer_targets
+    | `Incomplete_missing_attachement
+    | `Incomplete_multisample
+    | `Incomplete_read_buffer
+    | `Undefined
+    | `Unsupported ]      
+    
+  val status : renderer -> fbuf -> status
+
+  (** {1 Framebuffer reading} *) 
+  
+  type read = 
+    [ `Color_r of int 
+    | `Color_g of int 
+    | `Color_b of int 
+    | `Color_rgb of int 
+    | `Color_rgba of int
+    | `Depth
+    | `Stencil 
+    | `Depth_stencil ]
+  (** The type for framebuffer reads. For color components the
+        integer denotes the color attachement (ignored for {!default}).  *) 
+
+  val read : renderer -> fbuf -> read -> pos:p2 -> size:size2 -> 
+    buf -> unit
+  (** [read t f fmt buf] asynchronously reads the contents of
+        framebuffer [f] according to [fmt] and stores the result in
+        the GPU buffer of [buf].
+      
+        @raise Invalid_argument if [`Depth_stencil] is used and 
+        the scalar type of [buf] is not `UInt32 (the data is packed
+        as 24 bits of depth and 8 bits of stencil). *)
 end
 
 type op = 
@@ -1191,7 +1229,7 @@ type op =
 (** Renderers *) 
 module Renderer : sig
 
-  (** {1 Logging} *) 
+  (** {1 Logging and renderer capabilities} *) 
 
   module Log : sig
 
@@ -1260,39 +1298,6 @@ module Renderer : sig
     (** [of_formatter ppf] is a log that outputs on [ppf]. *) 
   end
 
-  (** Private functions and types for implementing renderers. 
-  
-      {b Warning.}  [Lit] users should not use these definitions. They 
-      expose [Lit]'s internals and are subject to change even between 
-      minor versions of the library. *)
-
-  (** {1:ops Render operations} *) 
-
-  val op : ?count:int -> ?uniforms:Uniform.set -> ?tr:m4 -> effect -> prim -> op
-  (** [op count uniforms tr e p] is a render op. [count] defaults to 1. 
-      [uniforms] defaults to {!Uniform.empty}, [tr] to {!M4.id}. *)
-    
-  val nop : op 
-  (** [nop] is a render no-op, it has no effect on the renderer. *) 
-
-  val add_op : renderer -> op -> unit
-  (** [add_op r o] adds render operation [o] on [r]. *) 
-
-  (** {1 Window geometry and projection} *)
-
-  val size : renderer -> size2
-  val set_size : renderer -> size2 -> unit
-  val view : renderer -> View.t
-  val set_view : renderer -> View.t -> unit
-
-  (** {1 Framebuffers} *) 
-    
-  val fbuf : renderer -> fbuf
-  (** [fbuf r] is the framebuffer on which render ops are performed. *)
-    
-  val set_fbuf : renderer -> fbuf -> unit
-  (** [set_fbuf r fbuf] sets the framebuffer to [fbuf]. *) 
-    
   (** Renderer capabilities. *)
   module Cap : sig
 
@@ -1333,10 +1338,34 @@ module Renderer : sig
         of the OpenGL implementation [r] is dealing with. *)
   end
 
- 
-  (** {1 Framebuffer clearing.} 
-      
-      {b TODO} shouldn't we move that to Fbuf and Renderer.Fbuf. *) 
+  (** {1:ops Render operations} *) 
+
+  val op : ?count:int -> ?uniforms:Uniform.set -> ?tr:m4 -> effect -> prim -> op
+  (** [op count uniforms tr e p] is a render op. [count] defaults to 1. 
+      [uniforms] defaults to {!Uniform.empty}, [tr] to {!M4.id}. *)
+    
+  val nop : op 
+  (** [nop] is a render no-op, it has no effect on the renderer. *) 
+
+  val add_op : renderer -> op -> unit
+  (** [add_op r o] adds render operation [o] on [r]. *) 
+
+  (** {1 Window geometry and projection} *)
+
+  val size : renderer -> size2
+  val set_size : renderer -> size2 -> unit
+  val view : renderer -> View.t
+  val set_view : renderer -> View.t -> unit
+
+  (** {1 Framebuffers} *) 
+    
+  val fbuf : renderer -> fbuf
+  (** [fbuf r] is the framebuffer on which render ops are performed. *)
+    
+  val set_fbuf : renderer -> fbuf -> unit
+  (** [set_fbuf r fbuf] sets the framebuffer to [fbuf]. *) 
+     
+  (** {1 Clearing state} *)
 
   type clears = 
     { clear_color : color option; 
@@ -1356,6 +1385,11 @@ module Renderer : sig
 
   (** {1 Renderers} *) 
 
+  (** Private functions and types for implementing renderers. 
+  
+      {b Warning.}  [Lit] users should not use these definitions. They 
+      expose [Lit]'s internals and are subject to change even between 
+      minor versions of the library. *)
   module Private : sig
 
     module Id : sig
@@ -1448,48 +1482,14 @@ module Renderer : sig
     end
   end
 
-  (** Renderer specific framebuffer functions. *) 
-  module Fbuf : sig 
-    
-    type read_buf = 
-      [ `Color_r of int 
-      | `Color_g of int 
-      | `Color_b of int 
-      | `Color_rgb of int 
-      | `Color_rgba of int
-      | `Depth
-      | `Stencil 
-      | `Depth_stencil ]
-    (** The type for framebuffer buffer read. For color components the
-        integer denotes the color attachement.  *) 
-
-    val async_read : renderer -> Fbuf.t -> read_buf -> pos:p2 -> size:size2 -> 
-      buf -> unit
-    (** [async_read t f fmt buf] asynchronously reads the contents of 
-        framebuffer [f] according to [fmt]
-        and stores the result in [buf]. 
-
-        @raise Invalid_argument if [`Depth_stencil] is used and 
-        the scalar type of [buf] is not `UInt32 (the data is packed
-        as 24 bits of depth and 8 bits of stencil). *)
-      
-    val complete : renderer -> Fbuf.t -> 
-      [ `Complete
-      | `Incomplete_attachement
-      | `Incomplete_draw_buffer
-      | `Incomplete_layer_targets
-      | `Incomplete_missing_attachement
-      | `Incomplete_multisample
-      | `Incomplete_read_buffer
-      | `Undefined
-      | `Unsupported ]      
-  end
-
-
   (** The type for a renderer backend. *) 
   module type T = sig
     
     type t 
+
+    module BCap : sig
+      val caps : t -> Private.Cap.t 
+    end
 
     module BBuf : sig 
       val sync_cpu_to_gpu : t -> buf -> unit
@@ -1499,8 +1499,10 @@ module Renderer : sig
       val gpu_unmap : t -> buf -> unit
     end
 
-    module BCap : sig
-      val caps : t -> Private.Cap.t 
+    module BFbuf : sig        
+      val status : t -> fbuf -> Fbuf.status
+      val read : t -> fbuf -> Fbuf.read -> pos:p2 -> size:size2 -> 
+        buf -> unit
     end
 
     val name : string
@@ -1518,33 +1520,6 @@ module Renderer : sig
     val add_op : t -> op -> unit
     val render : t -> clear:bool -> unit
     val release : t -> unit
-
-
-    module Fbuf : sig 
-      type read_buf = 
-        [ `Color_r of int 
-        | `Color_g of int 
-        | `Color_b of int 
-        | `Color_rgb of int 
-        | `Color_rgba of int
-        | `Depth
-        | `Stencil 
-        | `Depth_stencil ]
-      
-      val async_read : t -> fbuf -> read_buf -> pos:p2 -> size:size2 -> 
-        buf -> unit
-      
-      val complete : t -> fbuf -> 
-        [ `Complete
-        | `Incomplete_attachement
-        | `Incomplete_draw_buffer
-        | `Incomplete_layer_targets
-        | `Incomplete_missing_attachement
-        | `Incomplete_multisample
-        | `Incomplete_read_buffer
-        | `Undefined
-        | `Unsupported ]      
-    end 
   end
   
   type t = renderer
