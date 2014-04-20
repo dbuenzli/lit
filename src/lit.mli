@@ -1237,15 +1237,15 @@ module Fbuf : sig
   (** The type for framebuffer reads. For color components the
         integer denotes the color attachement (ignored for {!default}).  *) 
 
-  val read : renderer -> fbuf -> read -> pos:p2 -> size:size2 -> 
-    buf -> unit
-  (** [read t f fmt buf] asynchronously reads the contents of
-        framebuffer [f] according to [fmt] and stores the result in
-        the GPU buffer of [buf].
-      
-        @raise Invalid_argument if [`Depth_stencil] is used and 
-        the scalar type of [buf] is not `UInt32 (the data is packed
-        as 24 bits of depth and 8 bits of stencil). *)
+  val read : renderer -> fbuf -> read -> box2 -> buf -> unit
+  (** [read r fb read box buf] asynchronously reads the contents of
+      framebuffer [fb] according to [read] in the rectangle [box]
+      specified in integral screen coordinates and stores the result 
+      in the GPU buffer of [buf].
+
+      @raise Invalid_argument if [`Depth_stencil] is used and the
+      scalar type of [buf] is not `UInt32 (the data is packed as 24
+      bits of depth and 8 bits of stencil). *) 
 end
 
 type op = 
@@ -1376,7 +1376,7 @@ module Renderer : sig
   val add_op : renderer -> op -> unit
   (** [add_op r o] adds render operation [o] on [r]. *) 
 
-  (** {1 Window geometry and projection} *)
+  (** {1 Screen geometry and projection} *)
 
   val size : renderer -> size2
   val set_size : renderer -> size2 -> unit
@@ -1510,8 +1510,7 @@ module Renderer : sig
     module BFbuf : sig        
       val clear : t -> fbuf -> unit
       val status : t -> fbuf -> Fbuf.status
-      val read : t -> fbuf -> Fbuf.read -> pos:p2 -> size:size2 -> 
-        buf -> unit
+      val read : t -> fbuf -> Fbuf.read -> box2 -> buf -> unit
     end
 
     val name : string

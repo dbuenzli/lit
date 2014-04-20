@@ -69,17 +69,16 @@ let resize r size =
 let draw r app = draw r; App.update_surface app
 
 let dump r app =
-  let size = App.surface_size app in
-  let w = Float.int_of_round (Size2.w size) in 
-  let h = Float.int_of_round (Size2.h size) in 
-  let pos = P2.o in
+  let box = Box2.v P2.o (App.surface_size app) in
+  let w = Float.int_of_round (Box2.w box) in 
+  let h = Float.int_of_round (Box2.h box) in
   let fmt = Raster.Sample.(format rgb_l `UInt8) in
   let scalar_count = Raster.Sample.scalar_count ~w ~h fmt in
   let buf = Buf.create (`Gpu (`UInt8, scalar_count)) in 
-  Fbuf.read r Fbuf.default (`Color_rgb 0) ~pos ~size buf; 
+  Fbuf.read r Fbuf.default (`Color_rgb 0) box buf; 
   let ba = Buf.gpu_map r `R buf Ba.UInt8 in
   let fname = "/tmp/out.tga" in
-  begin match Tga.write fname `Color_rgb size ba with 
+  begin match Tga.write fname `Color_rgb (Box2.size box) ba with 
   | `Ok () -> () | `Error e -> Printf.eprintf "%s: %s" fname e
   end;
   Buf.gpu_unmap r buf;

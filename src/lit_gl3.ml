@@ -1236,12 +1236,12 @@ module BFbuf = struct
     let status = raw_status () in  
     Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf); status
 
-  let raw_read r fb rb ~pos ~size buf = 
+  let raw_read r fb rb box buf = 
     let bid = BBuf.setup r buf in
-    let x = Float.int_of_round (V2.x pos) in 
-    let y = Float.int_of_round (V2.y pos) in 
-    let w = Float.int_of_round (Size2.w size) in 
-    let h = Float.int_of_round (Size2.h size) in
+    let x = Float.int_of_round (Box2.ox box) in 
+    let y = Float.int_of_round (Box2.oy box) in 
+    let w = Float.int_of_round (Box2.w box) in 
+    let h = Float.int_of_round (Box2.h box) in
     let st = BBuf.(enum_of_scalar_type (Buf.scalar_type buf)) in
     let mode c = 
       if fb == Fbuf.default then Gl.back else
@@ -1265,11 +1265,11 @@ module BFbuf = struct
     Gl.read_pixels x y w h fmt st (`Offset 0);
     Gl.bind_buffer Gl.pixel_pack_buffer 0
   
-  let read r fb rb ~pos ~size buf = 
-    if r.fbuf == fb then raw_read r fb rb ~pos ~size buf else
+  let read r fb rb box buf = 
+    if r.fbuf == fb then raw_read r fb rb box buf else
     let id = setup r fb in 
     Gl.bind_framebuffer Gl.framebuffer id; 
-    raw_read r fb rb ~pos ~size buf;
+    raw_read r fb rb box buf;
     Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf)
 end
 

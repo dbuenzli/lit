@@ -431,8 +431,7 @@ module Renderer_types = struct
     module BFbuf : sig        
       val clear : t -> fbuf -> unit
       val status : t -> fbuf -> Fbuf_types.status
-      val read : t -> fbuf -> Fbuf_types.read -> pos:p2 -> size:size2 -> 
-        buf -> unit
+      val read : t -> fbuf -> Fbuf_types.read -> box2 -> buf -> unit
     end
 
     val name : string
@@ -1353,8 +1352,7 @@ module Fbuf = struct
 
   let clear (R ((module R), r)) fb = R.BFbuf.clear r fb
   let status (R ((module R), r)) fb = R.BFbuf.status r fb        
-  let read (R ((module R), r)) fb read ~pos ~size buf = 
-    R.BFbuf.read r fb read ~pos ~size buf
+  let read (R ((module R), r)) fb read box buf = R.BFbuf.read r fb read box buf
         
   (* Backend info *) 
 
