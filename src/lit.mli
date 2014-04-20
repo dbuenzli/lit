@@ -4,8 +4,6 @@
    %%NAME%% release %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-open Gg
-
 (** Lightweight OpenGL-based rendering engine. 
 
     Lit is a lightweight OpenGL-based rendering engine for OCaml. It
@@ -19,6 +17,8 @@ open Gg
     can be used safely even if there's no renderer setup.
 
     {e Release %%VERSION%% — %%MAINTAINER%% } *) 
+
+open Gg
 
 (** {1:rtype Renderer} *) 
 

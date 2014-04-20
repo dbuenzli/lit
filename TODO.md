@@ -1,10 +1,8 @@
-* FINALIZERS, don't call GL ! no guarantee on thread.
 * `Uniform.viewport_{o,size}` should we still have them in 
   normalized surface coordinate and have a seperate `surface_size`
   builtin ? 
 * Redo uniform handling, also Effect has ~uniforms and Prog ~uset  
 * Use Lequal as default depth test.
-* s/shader_kind/shader_stage
 * Add depth_range to View.
 * View is not what we want yet I think. I should be easy to change 
   the aspect e.g. maybe specify the projection through a variant.
@@ -16,13 +14,12 @@
 * Support for base vertex rendering. Prim.
 * Support for explicit resource allocate/disposal in the 
   Renderer.{Buf,Prog,Tex} modules. For now it's allocate on usage and 
-  and dispose in Gc.finalizer.
-* Tex format
+  and dispose in Gc.finalizer + call to Render. 
+  gpu_alloc : renderer -> t -> unit
+  gpu_dispose : renderer -> t -> unit
 * Multipass (or not) 
 * Transform feedback 
-* Renderer.Caps.
-* Renderer.Stats.
-* Renderer.Buf.{blit,get}
+* Renderer.Buf.{blit}
 * Source-level meta programming, embbed a small shading language in
   OCaml.
 * Buf.gpu_upload -> gpu_update ? Make it consistent with Tex.
@@ -37,6 +34,5 @@
 * Review sample_format to gl types. 
 * Want more control on how ops are going to be drawn. This goes 
   in pair with multipass and opacity and view setup. 
-  
   Maybe we should leave the sorting to higher-level abstractions and
   Renderer should be immediate mode. 

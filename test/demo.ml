@@ -14,7 +14,7 @@ let default_size = Size2.v 600. 400.
 (* Primitive cycler *) 
 
 let prim_cycler ?(normals = false) ?prims () = 
-  let prims = match prims with 
+  let prims () = match prims with 
   | Some [] -> invalid_arg "prims is the empty list"
   | Some prims -> prims 
   | None -> 
@@ -24,9 +24,9 @@ let prim_cycler ?(normals = false) ?prims () =
         lazy (with_normals (Litu.Prim.rect (`Size (Size2.v 1. 1.))));
         lazy (with_normals (Bunny.create ~scale:1.5 ())) ]
   in
-  let cycle = ref prims in
+  let cycle = ref (prims ()) in
   let rec loop () = match !cycle with 
-  | [] -> cycle := prims; loop () 
+  | [] -> cycle := prims (); loop () 
   | p :: ps -> cycle := ps; Lazy.force p
   in
   loop 

@@ -9,7 +9,7 @@ open Tgl3
 open Lit
 open Renderer.Private 
 
-let str = Printf.sprintf 
+let str = Format.asprintf
 
 (* Renderer ids. *) 
 
@@ -108,6 +108,7 @@ module Gl_hi = struct                         (* Wraps a few Gl functions. *)
     type t = Gl.enum 
     let compare : int -> int -> int = Pervasives.compare
   end
+  
   module Emap = Map.Make (Enum)
   
   let enum_map : not_found:(Gl.enum -> 'a) -> (Gl.enum * 'a) list ->  
@@ -136,8 +137,45 @@ type t =
       batches : op list Imap.t; (* maps programs ids to rendering operations *) 
     }
 
+type renderer = t
+
 let log_error r msg = r.log `Error msg 
 let log_debug r msg = r.log `Debug msg
+
+(* Backend info 
+
+   Generic backend info handler. Automatically adds cleanup 
+   actions to the renderer whenever the backend info is finalized. 
+   We can't execute OpenGL calls directly in the finalizer as
+   those functions may be executed by an arbitrary thread which 
+   leads to segfaults in most GL implementation. *) 
+
+module type BVal = sig
+  type t
+  val finalizer_add_action : renderer -> t -> (unit -> unit)
+end
+
+module type BInfoable = sig
+  type t
+  val binfo : t -> BInfo.t
+  val set_binfo : t -> BInfo.t -> unit
+end
+
+module BInfo_handler (M : BInfoable) (BVal : BVal) : sig 
+  val binfo : M.t -> BVal.t option
+  val get_binfo : M.t -> BVal.t
+  val set_binfo : renderer -> M.t -> BVal.t -> unit
+end = struct
+  let inject, project = BInfo.create () 
+  let binfo b = project (M.binfo b)
+  let get_binfo b = match binfo b with None -> assert false | Some i -> i
+  let set_binfo r b (i : BVal.t) = 
+    let finalize i = 
+      r.cleanups <- BVal.finalizer_add_action r i :: r.cleanups 
+    in
+    Gc.finalise finalize i;
+    M.set_binfo b (inject i)  
+end
 
 (* Backend caps *) 
 
@@ -152,6 +190,7 @@ module BCap = struct
         
   let gl_version () = get_version Gl.version 
   let glsl_version () = get_version Gl.shading_language_version 
+  
   let gl_renderer () = match Gl.get_string Gl.renderer with 
   | None -> "unknown" 
   | Some r -> r
@@ -218,32 +257,27 @@ module BBuf = struct
   | `R -> Gl.read_only 
   | `W -> Gl.write_only 
   | `RW -> Gl.read_write 
-                       
+   
   type binfo = 
-    { id : Id.t;                       (* Associated GL buffer object id. *) 
+    { id : Id.t;          (* Associated GL buffer object id. *) 
       scalar_type : Gl.enum;           (* Buffer scalar type *) }
 
-  let inject, project = BInfo.create () 
-  let binfo b = project (Buf.binfo b)
-  let get_binfo b = match binfo b with None -> assert false | Some i -> i
-  let set_binfo b (i : binfo) = Buf.set_binfo b (inject i)
+  module BVal = struct
+    type t = binfo 
+    let finalizer_add_action _ i = fun () ->
+      if i.id <> 0 then Gl_hi.delete_buffer i.id
+  end
 
-  let finalise_binfo i =
-    Gl_hi.delete_buffer i.id
-
-  let setup_binfo r b id = 
-    let i = { id; scalar_type = enum_of_scalar_type (Buf.scalar_type b) } in 
-    Gc.finalise finalise_binfo i;
-    set_binfo b i; 
-    i
+  include BInfo_handler (Buf) (BVal)
 
   let setup r b =
     let id = match binfo b with 
     | Some binfo -> binfo.id
     | None -> 
         let id = Gl_hi.gen_buffer () in
-        let binfo = setup_binfo r b id in
-        binfo.id
+        let i = { id; scalar_type = enum_of_scalar_type (Buf.scalar_type b) } in
+        set_binfo r b i; 
+        i.id
     in
     if not (Buf.gpu_upload b) then id else (* TODO unclear for `Gpu *) 
     let usage = enum_of_usage (Buf.usage b) in
@@ -271,7 +305,7 @@ module BBuf = struct
 
   let sync_gpu_to_cpu r b = 
     if not (Buf.gpu_exists b) then invalid_arg "no gpu buffer" else 
-    let binfo = get_binfo b in
+    let id = setup r b in
     let gpu_kount = Buf.gpu_count b in
     if Buf.cpu_count b <> gpu_kount 
     then Buf.(set_cpu_p b (create_bigarray_any (scalar_type b) gpu_kount));
@@ -279,7 +313,7 @@ module BBuf = struct
     | None -> assert false 
     | Some (Buf.Ba ba) ->
         let byte_count = Buf.cpu_byte_count b in
-        Gl.bind_buffer Gl.array_buffer binfo.id;
+        Gl.bind_buffer Gl.array_buffer id;
         Gl.get_buffer_sub_data Gl.array_buffer 0 byte_count ba;
         Gl.bind_buffer Gl.array_buffer 0
       
@@ -290,8 +324,8 @@ module BBuf = struct
      zero once we unmap (would need to do it in C I guess).  *)
 
   let gpu_map r access b st = 
-    let id = setup r b in 
     Buf.check_ba_scalar_type b st;
+    let id = setup r b in
     let kind = Ba.ba_kind_of_ba_scalar_type st in
     let access = enum_of_access access in
     let count = Buf.gpu_count b in
@@ -328,23 +362,19 @@ module BPrim = struct
     { id : Id.t;                 (* Associated GL vertex array object. *) 
       kind : Gl.enum;                  (* kind of primitive (GL mode). *) 
       mutable locs : int Smap.t; (* maps attr names to bound location. *) 
-      mutable last_prog : Id.t; }  (* last program id it was bound to. *) 
-          
-  let inject, project = BInfo.create ()
-  let binfo p = project (Prim.binfo p)
-  let get_binfo p = match binfo p with None -> assert false | Some i -> i
-  let set_binfo p (i : binfo) = Prim.set_binfo p (inject i)
+      mutable last_prog : Id.t; }  (* last program id it was bound to. 
+                                      FIXME. Potentially there could be a 
+                                      race with that optim if a GL 
+                                      implementation quickly recycles IDs. *)
 
-  let finalise_binfo i =
-    Gl_hi.delete_vertex_array i.id
+  module BVal = struct
+    type t = binfo 
+    let finalizer_add_action _ i = fun () ->
+      if i.id <> 0 then Gl_hi.delete_vertex_array i.id
+  end
 
-  let setup_binfo r p id =
-    let kind = enum_of_kind (Prim.kind p) in
-    let i = { id; kind; locs = Smap.empty; last_prog = 0 } in 
-    Gc.finalise finalise_binfo i;
-    set_binfo p i;
-    i
-
+  include BInfo_handler (Prim) (BVal)
+  
   let setup r p = match binfo p with 
   | Some _ -> 
       let update_attr a = ignore (BBuf.setup r (Attr.buf a)) in
@@ -355,13 +385,15 @@ module BPrim = struct
       end
   | None -> 
       let id = Gl_hi.gen_vertex_array () in
-      let binfo = setup_binfo r p id in
+      let kind = enum_of_kind (Prim.kind p) in
+      let i = { id; kind; locs = Smap.empty; last_prog = 0 } in 
       let index_id = match Prim.index p with 
       | None -> 0 
       | Some index -> BBuf.setup r index
       in
+      set_binfo r p i;
       Prim.iter (fun a -> ignore (BBuf.setup r (Attr.buf a))) p;
-      Gl.bind_vertex_array binfo.id;
+      Gl.bind_vertex_array i.id;
       Gl.bind_buffer Gl.element_array_buffer index_id;
       (* attrs are bound later, see Prog.bind_prim *) 
       Gl.bind_vertex_array 0; 
@@ -449,7 +481,6 @@ module BTex = struct
         end
     | `Stencil `UInt8 -> Gl.stencil_index8
 
-
   type int_scalar_type = [ `Int8 | `Int16 | `Int32 | `Int64 
                          | `UInt8 | `UInt16 | `UInt32 | `UInt64 ]
 
@@ -482,20 +513,16 @@ module BTex = struct
     Gl.float
   | _ -> (* TODO *) failwith "TODO"
 
+  
   type binfo = { id : Id.t;  }
-  let inject, project = BInfo.create () 
-  let binfo p = project (Tex.binfo p) 
-  let get_binfo p = match binfo p with None -> assert false | Some i -> i 
-  let set_binfo p (i : binfo) = Tex.set_binfo p (inject i) 
+               
+  module BVal = struct
+    type t = binfo
+    let finalizer_add_action _ i = fun () -> 
+      if i.id <> 0 then Gl_hi.delete_texture i.id      
+  end
 
-  let finalise_binfo i = 
-    Gl_hi.delete_texture i.id
-
-  let setup_binfo r t id = 
-    let i = { id } in 
-    Gc.finalise finalise_binfo i;
-    set_binfo t i; 
-    i
+  include BInfo_handler (Tex) (BVal)
 
   let setup r t = 
     if t == Tex.nil then 0 else
@@ -503,8 +530,9 @@ module BTex = struct
     | Some binfo -> binfo.id
     | None -> 
         let id = Gl_hi.gen_texture () in 
-        let binfo = setup_binfo r t id  in
-        binfo.id
+        let i = { id } in
+        set_binfo r t i; 
+        i.id
     in
     if not (Tex.gpu_update t) then id else
     let buf_id = match Tex.buf t with 
@@ -702,13 +730,13 @@ module BProg = struct
   let error_binfo = (* info for failing programs. *) 
     { id = 0; attrs = Smap.empty; uniforms = Smap.empty; } 
 
-  let inject, project = BInfo.create ()
-  let binfo prog = project (Prog.binfo prog)
-  let get_binfo prog = match binfo prog with None -> assert false | Some i -> i
-  let set_binfo prog (i : binfo) = Prog.set_binfo prog (inject i)
+  module BVal = struct
+    type t = binfo 
+    let finalizer_add_action _ i = fun () -> 
+      if i.id <> 0 then Gl.delete_program i.id
+  end
 
-  let finalise_binfo i =
-    Gl.delete_program i.id
+  include BInfo_handler (Prog) (BVal)
 
   (* Used by setup_binfo, avoid allocating them all the time *) 
   let size_cell = Ba.create Ba.Int32 1
@@ -748,8 +776,7 @@ module BProg = struct
       end
     done;
     let i = { id; attrs = !attrs; uniforms = !uniforms } in 
-    Gc.finalise finalise_binfo i;
-    set_binfo prog i;
+    set_binfo r prog i;
     i
     
   let compiler_log_msg r sid file_id_map =
@@ -802,7 +829,7 @@ module BProg = struct
       | `Error -> `Error 
       in
       match binfo with 
-      | `Error -> set_binfo prog error_binfo; `Error
+      | `Error -> set_binfo r prog error_binfo; `Error
       | `Ok binfo -> `Ok (binfo.id)
 
   let resolve_builtin r model_to_world = function 
@@ -1110,50 +1137,40 @@ module BFbuf = struct
   module Rbuf_impl = struct 
 
     type binfo = { id : Id.t; }    (* Associated GL render buffer object id. *) 
-      
-    let inject, project = BInfo.create () 
-    let binfo b = project (Fbuf.Rbuf.binfo b)
-    let get_binfo b = match binfo b with None -> assert false | Some i -> i
-    let set_binfo b (i : binfo) = Fbuf.Rbuf.set_binfo b (inject i)
 
-    let finalise_binfo i =
-      Gl_hi.delete_render_buffer i.id
+    module BVal = struct 
+      type t = binfo 
+      let finalizer_add_action _ i = fun () -> 
+        if i.id <> 0 then Gl_hi.delete_render_buffer i.id
+    end
 
-    let setup_binfo r b id = 
-      let i = { id; } in 
-      Gc.finalise finalise_binfo i;
-      set_binfo b i; 
-      i
-      
+    include BInfo_handler (Fbuf.Rbuf) (BVal)
+
     let setup r b = match binfo b with 
     | Some binfo -> binfo.id
     | None -> 
         let id = Gl_hi.gen_render_buffer () in
-        let _ = setup_binfo r b id in
         let w = Float.int_of_round (Size2.w (Fbuf.Rbuf.size2 b)) in 
         let h = Float.int_of_round (Size2.h (Fbuf.Rbuf.size2 b)) in 
         let sf = Fbuf.Rbuf.sample_format b in
         let f = BTex.internal_format_enum_of_format sf in
         let m = match Fbuf.Rbuf.multisample b with None -> 0 | Some m -> m in
+        set_binfo r b { id; };
         Gl.bind_renderbuffer Gl.renderbuffer id;
         Gl.renderbuffer_storage_multisample Gl.renderbuffer m f w h; 
+        Gl.bind_renderbuffer Gl.renderbuffer 0;
         id
   end
 
   type binfo = { id : Id.t; }         (* Associated GL framebuffer object id. *)
-  let inject, project = BInfo.create () 
-  let binfo b = project (Fbuf.binfo b)
-  let get_binfo b = match binfo b with None -> assert false | Some i -> i
-  let set_binfo b (i : binfo) = Fbuf.set_binfo b (inject i)
 
-  let finalise_binfo i =
-    Gl_hi.delete_framebuffer i.id
+  module BVal = struct 
+    type t = binfo 
+    let finalizer_add_action _ i = fun () -> 
+      if i.id <> 0 then Gl_hi.delete_framebuffer i.id
+    end
 
-  let setup_binfo r fb id = 
-    let i = { id; } in 
-    Gc.finalise finalise_binfo i;
-    set_binfo fb i; 
-    i
+  include BInfo_handler (Fbuf) (BVal)
 
   let attach r a = 
     let attach pt = function 
@@ -1173,15 +1190,16 @@ module BFbuf = struct
     | `Depth_stencil i -> attach Gl.depth_stencil_attachment i 
     | `Stencil i -> attach Gl.stencil i
 
-  let setup r fb = 
+  let rec setup r fb = 
     if fb == Fbuf.default then 0 else
     match binfo fb with 
     | Some binfo -> binfo.id
     | None -> 
         let id = Gl_hi.gen_framebuffer () in
-        let _ = setup_binfo r fb id in
+        set_binfo r fb { id; }; 
         Gl.bind_framebuffer Gl.framebuffer id;
         List.iter (attach r) (Fbuf.attachements fb);
+        Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf);
         id
 
   let status_enum_to_variant = 
@@ -1375,9 +1393,13 @@ let add_op r op =  match BProg.setup r (Effect.prog op.effect) with
     let batches = try Imap.find prog_id r.batches with Not_found -> [] in
     r.batches <- Imap.add prog_id (op :: batches) r.batches; 
     BPrim.setup r op.prim
-        
+
+let cleanup r =         
+  List.iter (fun clean -> clean ()) r.cleanups; 
+  r.cleanups <- []
+
 let render r ~clear =
-  if not (r.cleanups = []) then List.iter (fun clean -> clean ()) r.cleanups;
+  if not (r.cleanups = []) then cleanup r; 
   init_framebuffer r clear;
   let batches = r.batches in 
   r.batches <- Imap.empty;

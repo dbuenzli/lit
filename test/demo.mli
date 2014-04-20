@@ -31,7 +31,6 @@ val ev_of_command_handler :
 
 val default_size : size2 
 
-
 (** {1 Terminal output} *) 
 
 val show_start : Lit.Renderer.t -> unit
