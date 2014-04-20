@@ -1272,7 +1272,7 @@ module Renderer : sig
       val compare : t -> t -> int
     end
 
-    module Info : sig
+    module BInfo : sig
       type t 
       val create : unit -> ('a -> t) * (t -> 'a option)
       val none : t
@@ -1293,8 +1293,8 @@ module Renderer : sig
       val cpu_p : buf -> bigarray_any option
       val set_cpu_p : buf -> bigarray_any -> unit
       val check_ba_scalar_type : buf -> ('a, 'b) Ba.ba_scalar_type -> unit
-      val info : buf -> Info.t
-      val set_info : buf -> Info.t -> unit
+      val binfo : buf -> BInfo.t
+      val set_binfo : buf -> BInfo.t -> unit
     end
    
     module Attr : sig 
@@ -1303,20 +1303,20 @@ module Renderer : sig
 
     module Prim : sig 
       include module type of Prim
-      val info : prim -> Info.t
-      val set_info : prim -> Info.t -> unit
+      val binfo : prim -> BInfo.t
+      val set_binfo : prim -> BInfo.t -> unit
     end
 
     module Tex : sig 
       include module type of Tex 
-      val info : tex -> Info.t 
-      val set_info : tex -> Info.t -> unit
+      val binfo : tex -> BInfo.t 
+      val set_binfo : tex -> BInfo.t -> unit
     end
 
     module Prog : sig 
       include module type of Prog
-      val info : prog -> Info.t
-      val set_info : prog -> Info.t -> unit
+      val binfo : prog -> BInfo.t
+      val set_binfo : prog -> BInfo.t -> unit
     end
 
     module Effect : sig
@@ -1324,19 +1324,19 @@ module Renderer : sig
                                      and type depth = Effect.depth 
                                      and type blend = Effect.blend
                                                          
-      val info : effect -> Info.t
-      val set_info : effect -> Info.t -> unit
+      val binfo : effect -> BInfo.t
+      val set_binfo : effect -> BInfo.t -> unit
     end
 
     module Fbuf : sig 
       module Rbuf : sig 
         include module type of Fbuf.Rbuf with type t = Fbuf.Rbuf.t
-        val info : t -> Info.t 
-        val set_info : t -> Info.t -> unit
+        val binfo : t -> BInfo.t 
+        val set_binfo : t -> BInfo.t -> unit
       end
       include module type of Fbuf with module Rbuf := Rbuf
-      val info : fbuf -> Info.t 
-      val set_info : fbuf -> Info.t -> unit
+      val binfo : fbuf -> BInfo.t 
+      val set_binfo : fbuf -> BInfo.t -> unit
     end
     
     module Log : sig 

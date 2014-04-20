@@ -45,9 +45,9 @@ module Id = struct
   let compare : int -> int -> int = Pervasives.compare
 end
 
-(* Renderer info *) 
+(* Renderer backend info *) 
 
-module Info = struct
+module BInfo = struct
   type t = exn         (* universal type, see http://mlton.org/UniversalType *) 
   let create (type s) () = 
     let module M = struct exception E of s option end in 
@@ -85,7 +85,7 @@ module Buf_types = struct
       mutable gpu_upload : bool;
       mutable cpu_autorelease : bool;
       mutable cpu : bigarray_any option; 
-      mutable info : Info.t; }
+      mutable binfo : BInfo.t; }
 
   type access = [ `R | `W | `RW ]
 end
@@ -125,7 +125,7 @@ module Prim_types = struct
       index : buf option;
       kind : kind; 
       attrs : attr Smap.t; 
-      mutable info : Info.t; }
+      mutable binfo : BInfo.t; }
 end
 
 type prim = Prim_types.t
@@ -175,7 +175,7 @@ module Tex_types = struct
       mutable multisample : (int * bool) option;
       mutable min_filter : min_filter; 
       mutable mag_filter : mag_filter; 
-      mutable info : Info.t; }  
+      mutable binfo : BInfo.t; }  
 end
 
 type tex = Tex_types.t
@@ -257,7 +257,7 @@ module Prog_types = struct
     { name : string; 
       shaders : shader list; 
       uset : Uniform_types.set;
-      mutable info : Info.t }
+      mutable binfo : BInfo.t }
 end
 
 type prog = Prog_types.t
@@ -306,7 +306,7 @@ module Effect_types = struct
       blend : blend;
       prog : prog; 
       mutable uniforms : Uniform_types.set; 
-      mutable info : Info.t; } 
+      mutable binfo : BInfo.t; } 
 end
 
 type effect = Effect_types.t
@@ -325,7 +325,7 @@ module Rbuf_types = struct
   type t = { multisample : int option; 
              size : size2; 
              sample_format : Tex_types.sample_format; 
-             mutable info : Info.t }
+             mutable binfo : BInfo.t }
 end
 
 module Fbuf_types = struct
@@ -341,7 +341,7 @@ module Fbuf_types = struct
     | `Stencil of image 
     | `Depth_stencil of image ]
     
-  type t = { attachements : attachement list; mutable info : Info.t }
+  type t = { attachements : attachement list; mutable binfo : BInfo.t }
 end
 
 type fbuf = Fbuf_types.t
@@ -496,7 +496,7 @@ module Buf = struct
     let create scalar_type ?(gpu_count = 0) cpu = 
       { usage; scalar_type; 
         gpu_count; gpu_exists = false; gpu_upload = true; 
-        cpu_autorelease; cpu; info = Info.none }
+        cpu_autorelease; cpu; binfo = BInfo.none }
     in
     match init with 
     | `Cpu (scalar_type, cpu_count) -> 
@@ -593,8 +593,8 @@ module Buf = struct
 
   (* Renderer info *) 
 
-  let info b = b.info 
-  let set_info b i = b.info <- i
+  let binfo b = b.binfo 
+  let set_binfo b i = b.binfo <- i
 end
 
 (* Attributes *)
@@ -673,7 +673,7 @@ module Prim = struct
     in
     { tr; name; first; count; index; kind;
       attrs = List.fold_left add_attr Smap.empty attrs;
-      info = Info.none }
+      binfo = BInfo.none }
 
   let kind p = p.kind
   let name p = p.name 
@@ -720,8 +720,8 @@ module Prim = struct
 
   (* Renderer info *) 
 
-  let info b = b.info 
-  let set_info b i = b.info <- i
+  let binfo b = b.binfo 
+  let set_binfo b i = b.binfo <- i
 end
 
 (* Textures *) 
@@ -854,7 +854,7 @@ module Tex = struct
       multisample = None; 
       min_filter = `Nearest_mipmap_linear; 
       mag_filter = `Nearest;
-      info = Info.none; }
+      binfo = BInfo.none; }
 
   let create ?(wrap_s = `Repeat) ?(wrap_t = `Repeat) ?(wrap_r = `Repeat) 
       ?(mipmaps = false) ?(min_filter = `Nearest_mipmap_linear) 
@@ -886,7 +886,7 @@ module Tex = struct
       wrap_s; wrap_t; wrap_r;
       mipmaps; min_filter; mag_filter;
       multisample;
-      info = Info.none; }
+      binfo = BInfo.none; }
   
   let sample_format t = t.sample_format
   let kind t = t.kind
@@ -918,8 +918,8 @@ module Tex = struct
 
   (* Renderer info *) 
 
-  let info b = b.info 
-  let set_info b i = b.info <- i
+  let binfo b = b.binfo 
+  let set_binfo b i = b.binfo <- i
 end
 
 (* Uniforms *) 
@@ -1190,7 +1190,7 @@ module Prog = struct
     fun () -> incr count; Printf.sprintf "prog%d" !count
       
   let create ?(name = gen_name ()) ?(uset = Uniform.empty) shaders = 
-    { name; shaders; uset; info = Info.none }
+    { name; shaders; uset; binfo = BInfo.none }
 
   let name p = p.name
   let uniforms p = p.uset
@@ -1198,8 +1198,8 @@ module Prog = struct
 
   (* Renderer info *) 
 
-  let info e = e.info 
-  let set_info e i = e.info <- i
+  let binfo e = e.binfo 
+  let set_binfo e i = e.binfo <- i
 end
 
 module View = struct
@@ -1306,7 +1306,7 @@ module Effect = struct
     | None -> Prog.uniforms prog 
     | Some us -> us
     in
-    { raster; depth; blend; prog; uniforms; info = Info.none }
+    { raster; depth; blend; prog; uniforms; binfo = BInfo.none }
            
   let prog e = e.prog
   let uniforms e = e.uniforms 
@@ -1318,8 +1318,8 @@ module Effect = struct
   
   (* Renderer info *) 
 
-  let info e = e.info
-  let set_info e i = e.info <- i
+  let binfo e = e.binfo
+  let set_binfo e i = e.binfo <- i
 end
 
 module Fbuf = struct
@@ -1329,22 +1329,22 @@ module Fbuf = struct
     include Rbuf_types
     
     let create ?multisample size sample_format = 
-      { multisample; size; sample_format; info = Info.none }
+      { multisample; size; sample_format; binfo = BInfo.none }
 
     let size2 b = b.size 
     let sample_format b = b.sample_format
     let multisample b = b.multisample
-    let info b = b.info
-    let set_info b i = b.info <- i
+    let binfo b = b.binfo
+    let set_binfo b i = b.binfo <- i
   end
 
   include Fbuf_types 
   
-  let default = { attachements = []; info = Info.none }
-  let create attachements = { attachements; info = Info.none }
+  let default = { attachements = []; binfo = BInfo.none }
+  let create attachements = { attachements; binfo = BInfo.none }
   let attachements f = f.attachements
-  let info f = f.info
-  let set_info f i = f.info <- i
+  let binfo f = f.binfo
+  let set_binfo f i = f.binfo <- i
 end
 
 
@@ -1504,7 +1504,7 @@ module Renderer = struct
 
   module Private = struct    
     module Id = Id
-    module Info = Info
+    module BInfo = BInfo
     module Cap = Cap 
     module Buf = Buf
     module Attr = Attr
