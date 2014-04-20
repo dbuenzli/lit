@@ -6,8 +6,8 @@ Lit is a lightweight OpenGL-based rendering engine for OCaml. It
 provides a thin abstraction to program GPUs with OpenGL, OpenGL ES or
 WebGL.
 
-Lit depends on [gg][1]. The OpenGL 3.X, 4.X and ES 2 renderers depend
-on [tgls][2]. The WebGL renderer on [js_of_ocaml][3]. Lit and its
+Lit depends on [gg][1]. The OpenGL and OpenGL ES renderers depend on
+[tgls][2]. The WebGL renderer on [js_of_ocaml][3]. Lit and its
 renderers are distributed under the BSD3 license.
   
 [1]: http://erratique.ch/software/gg
@@ -23,7 +23,7 @@ Contact: Daniel Bünzli `<daniel.buenzl i@erratique.ch>`
 Lit can be installed with `opam`:
 
     opam install gg tgls js_of_ocaml lit   # All renderers
-    opam install gg tgls lit               # OpenGL {3,4,ES 2} renderers 
+    opam install gg tgls lit               # OpenGL and OpenGL ES renderers 
     opam install gg js_of_ocaml lit        # WebGL renderer
     opam install gg lit                    # No renderer
     

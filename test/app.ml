@@ -53,7 +53,7 @@ type ev =
 
 type ev_ret = [ `Ok | `Error of string | `Yield | `Quit ]
 
-let select_backend () = (module Lit_gl3 : Lit.Renderer.T)
+let select_backend () = (module Lit_gl : Lit.Renderer.T)
 
 (* Configuration *)
 

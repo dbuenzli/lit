@@ -4,6 +4,12 @@
    %%NAME%% release %%VERSION%%
   ---------------------------------------------------------------------------*)
 
+(** OpenGL renderer. *) 
+
+open Lit
+
+include Renderer.T
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2014 Daniel C. Bünzli.
    All rights reserved.

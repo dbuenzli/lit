@@ -7,9 +7,8 @@
 <src/lit.{mli,ml}> : package(gg)
 <src/lit{u,_}.{mli,ml}> : package(gg)
 
-<src/lit_gl3.{mli,ml}> : package(gg), package(tgls.tgl3)
-<src/lit_gl4.{mli,ml}> : package(gg), package(tgls.tgl4)
-<src/lit_gles2.{mli,ml}> : package(gg), package(tgls.tgles2)
+<src/lit_gl.{mli,ml}> : package(gg), package(tgls.tgl3)
+<src/lit_gles.{mli,ml}> : package(gg), package(tgls.tgles2)
 <src/lit_webgl.{mli,ml}> : package(gg), package(js_of_ocaml.syntax), \
                            syntax(camlp4o)
 

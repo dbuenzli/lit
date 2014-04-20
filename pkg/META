@@ -29,37 +29,26 @@ package "u" (
   exists_if = "litu.cma"
 )
 
-package "gl3" (
+package "gl" (
   version = "%%VERSION%%"
-  description = "Lit's OpenGL 3.x backend"
+  description = "Lit's OpenGL > 3.x backend"
   requires = "lit tgls.tgl3"
-  archive(byte) = "lit_gl3.cma"
-  archive(byte, plugin) = "lit_gl3.cma"
-  archive(native) = "lit_gl3.cmxa"
-  archive(native, plugin) = "lit_gl3.cmxs"
-  exists_if = "lit_gl3.cma"
+  archive(byte) = "lit_gl.cma"
+  archive(byte, plugin) = "lit_gl.cma"
+  archive(native) = "lit_gl.cmxa"
+  archive(native, plugin) = "lit_gl.cmxs"
+  exists_if = "lit_gl.cma"
 )
 
-package "gl4" (
+package "gles" (
   version = "%%VERSION%%"
-  description = "Lit's OpenGL 4.x backend"
-  requires = "lit tgls.tgl4"
-  archive(byte) = "lit_gl4.cma"
-  archive(byte, plugin) = "lit_gl4.cma"
-  archive(native) = "lit_gl4.cmxa"
-  archive(native, plugin) = "lit_gl4.cmxs"
-  exists_if = "lit_gl4.cma"
-)
-
-package "gles2" (
-  version = "%%VERSION%%"
-  description = "Lit's OpenGL ES 2.x backend"
-  requires = "lit tgls.tgles2"
-  archive(byte) = "lit_gles2.cma"
-  archive(byte, plugin) = "lit_gles2.cma"
-  archive(native) = "lit_gles2.cmxa"
-  archive(native, plugin) = "lit_gles2.cmxs"
-  exists_if = "lit_gles2.cma"
+  description = "Lit's OpenGL ES > 2.x backend"
+  requires = "lit tgls.tgles"
+  archive(byte) = "lit_gles.cma"
+  archive(byte, plugin) = "lit_gles.cma"
+  archive(native) = "lit_gles.cmxa"
+  archive(native, plugin) = "lit_gles.cmxs"
+  exists_if = "lit_gles.cma"
 )
 
 package "webgl" (
