@@ -56,20 +56,416 @@ module Info = struct
   let none = fst (create ()) None
 end
 
+(* These types need to be defined here for being able to define 
+   the [renderer] type. *) 
+
+module Smap = Map.Make(String) 
+
+(* Buffers *) 
+
+module Buf_types = struct 
+
+  type usage = 
+    [ `Static_draw | `Static_read | `Static_copy
+    | `Stream_draw | `Stream_read | `Stream_copy
+    | `Dynamic_draw | `Dynamic_read | `Dynamic_copy ]
+    
+  type ('a, 'b) init = 
+    [ Gg.buffer
+    | `Cpu of Ba.scalar_type * int
+    | `Gpu of Ba.scalar_type * int ]
+
+  type bigarray_any = Ba : ('a, 'b) bigarray -> bigarray_any    
+
+  type t = 
+    { usage : usage; 
+      scalar_type : Ba.scalar_type;
+      mutable gpu_count : int;     
+      mutable gpu_exists : bool;   
+      mutable gpu_upload : bool;
+      mutable cpu_autorelease : bool;
+      mutable cpu : bigarray_any option; 
+      mutable info : Info.t; }
+end
+
+type buf = Buf_types.t
+
+(* Attributes *) 
+
+module Attr_types = struct
+  type t = 
+    { name : string; 
+      dim : int; 
+      buf : buf; 
+      stride : int; 
+      first : int; 
+      normalize : bool; }
+end
+
+type attr = Attr_types.t
+
+(* Primitives *) 
+
+module Prim_types = struct
+  
+  type kind = 
+    [ `Points 
+    | `Lines | `Line_strip | `Line_loop | `Lines_adjacency 
+    | `Line_strip_adjacency 
+    | `Triangles | `Triangle_strip | `Triangle_fan
+    | `Triangles_adjacency | `Triangle_strip_adjacency ]
+            
+  type t = 
+    { tr : M4.t; 
+      name : string;
+      first : int;
+      count : int option; 
+      index : buf option;
+      kind : kind; 
+      attrs : attr Smap.t; 
+      mutable info : Info.t; }
+end
+
+type prim = Prim_types.t
+
+(* Textures *) 
+
+module Tex_types = struct
+
+  type wrap = [ `Repeat | `Mirrored_repeat | `Clamp_to_edge ]      
+  type mag_filter = [ `Linear | `Nearest ]
+  type min_filter = 
+    [ `Linear | `Linear_mipmap_linear | `Linear_mipmap_nearest
+    | `Nearest | `Nearest_mipmap_linear | `Nearest_mipmap_nearest ]
+
+  type kind = [ `D1 | `D2 | `D3 | `D2_ms | `D3_ms | `Buffer ]
+
+  type sample_format = 
+    [ `D1 of Ba.scalar_type * bool 
+    | `D2 of Ba.scalar_type * bool 
+    | `D3 of Ba.scalar_type * bool 
+    | `D4 of Ba.scalar_type * bool
+    | `SRGB of [ `UInt8 ]
+    | `SRGBA of [ `UInt8 ]
+    | `Depth of [ `UInt16 | `UInt24 | `Float32 ]
+    | `Stencil of [ `UInt8 ]
+    | `Depth_stencil of [ `UInt24_UInt8 | `Float32_UInt8 ] ]
+
+  type init =
+    [ `D1 of sample_format * float * buf option
+    | `D2 of sample_format * size2 * buf option
+    | `D3 of sample_format * size3 * buf option
+    | `D2_ms of sample_format * size2 * int * bool 
+    | `D3_ms of sample_format * size3 * int * bool 
+    | `Buffer of sample_format * buf ]
+
+  type t = 
+    { kind : kind; 
+      sample_format : sample_format; 
+      mutable size : size3;
+      mutable buf : buf option;
+      mutable buf_autorelease : bool;
+      mutable gpu_update : bool; 
+      mutable wrap_s : wrap;
+      mutable wrap_t : wrap;
+      mutable wrap_r : wrap;
+      mutable mipmaps : bool; 
+      mutable multisample : (int * bool) option;
+      mutable min_filter : min_filter; 
+      mutable mag_filter : mag_filter; 
+      mutable info : Info.t; }  
+end
+
+type tex = Tex_types.t
+
+(* Uniforms *) 
+
+module Uniform_types = struct
+  type 'a value = 
+    | Bool : bool -> bool value
+    | Int : int -> int value 
+    | Float : float -> float value
+    | V2 : v2 -> v2 value 
+    | V3 : v3 -> v3 value 
+    | V4 : v4 -> v4 value 
+    | M2 : m2 -> m2 value
+    | M3 : m3 -> m3 value
+    | M4 : m4 -> m4 value
+    | Tex : tex -> tex value
+    | Model_to_world : m4 value
+    | Model_to_view : m4 value 
+    | Model_to_clip : m4 value 
+    | Model_normal_to_view : m3 value 
+    | World_to_view : m4 value
+    | World_to_clip : m4 value 
+    | View_to_clip : m4 value 
+    | Viewport_o : v2 value
+    | Viewport_size : v2 value
+
+  type builtin = 
+    [ `Model_to_world 
+    | `Model_to_view 
+    | `Model_to_clip 
+    | `Model_normal_to_view 
+    | `World_to_view 
+    | `World_to_clip 
+    | `View_to_clip
+    | `Viewport_o
+    | `Viewport_size ]
+
+  type value_untyped = 
+    [ `Bool of bool 
+    | `Int of int 
+    | `Float of float 
+    | `V2 of v2 
+    | `V3 of v3 
+    | `V4 of v4 
+    | `M2 of m2
+    | `M3 of m3
+    | `M4 of m4 
+    | `Tex of tex
+    | `Builtin of builtin ]
+
+  type 'a t = string * 'a value * ('a -> value_untyped) 
+
+  type set = value_untyped Smap.t   
+end
+
+type 'a uniform = 'a Uniform_types.t
+
+(* Programs *) 
+
+module Prog_types = struct
+  type loc = [ `Loc of string * int | `Unknown ] 
+  type insert = loc * string 
+  type lang = [ `GLSL of int | `GLSL_ES of int ] 
+              
+  type shader_kind = 
+    [ `Vertex | `Tess_control | `Tess_evaluation | `Geometry
+    | `Fragment | `Compute ]
+    
+  type shader = 
+    { kind : shader_kind; 
+      lang : lang option;
+      srcs : (loc * string) list (* list is reversed *); }
+    
+  type source = string * (int * string) list 
+
+  type t = 
+    { name : string; 
+      shaders : shader list; 
+      uset : Uniform_types.set;
+      mutable info : Info.t }
+end
+
+type prog = Prog_types.t
+
+(* Effects *) 
+
+module Effect_types = struct
+  type raster_face_cull = [ `Front | `Back ] 
+  type raster = { raster_face_cull : raster_face_cull option } 
+  type depth_test = 
+    [ `Never | `Less | `Equal | `Lequal | `Greater | `Nequal | `Gequal 
+    | `Always ]
+
+  type depth = 
+    { depth_test : depth_test option; 
+      depth_write : bool;
+      depth_offset : float * float; }
+    
+  type blend_mul = 
+    [ `Zero | `One
+    | `Src | `One_minus_src
+    | `Src_a | `One_minus_src_a | `Src_a_saturate
+    | `Src1 | `One_minus_src1
+    | `Src1_a | `One_minus_src1_a
+    | `Dst | `One_minus_dst
+    | `Dst_a | `One_minus_dst_a
+    | `Cst | `One_minus_cst
+    | `Cst_a | `One_minus_cst_a ]
+
+  type blend_eq = 
+    [ `Add of blend_mul * blend_mul 
+    | `Sub of blend_mul * blend_mul 
+    | `Rev_sub of blend_mul * blend_mul
+    | `Min 
+    | `Max ]
+
+  type blend =  
+    { blend : bool;
+      blend_rgb : blend_eq;
+      blend_a : blend_eq;
+      blend_cst : color; }
+
+  type t = 
+    { raster : raster; 
+      depth : depth;
+      blend : blend;
+      prog : prog; 
+      mutable uniforms : Uniform_types.set; 
+      mutable info : Info.t; } 
+end
+
+type effect = Effect_types.t
+
+(* Views *) 
+
+module View_types = struct
+  type t = { mutable tr : m4; mutable proj : m4; mutable viewport : box2 }
+end
+
+type view = View_types.t 
+
+(* Framebuffers *) 
+
+module Rbuf_types = struct
+  type t = { multisample : int option; 
+             size : size2; 
+             sample_format : Tex_types.sample_format; 
+             mutable info : Info.t }
+end
+
+module Fbuf_types = struct
+    
+  type image = 
+    [ `Tex of int * tex 
+    | `Tex_layer of int * int * tex 
+    | `Rbuf of Rbuf_types.t ] 
+    
+  type attachement = 
+    [ `Color of int * image 
+    | `Depth of image 
+    | `Stencil of image 
+    | `Depth_stencil of image ]
+    
+  type t = { attachements : attachement list; mutable info : Info.t }
+end
+
+type fbuf = Fbuf_types.t
+
+module Log_types = struct
+
+  type compiler_msg = 
+    [ `Msg of string | `Msg_loc of string * Prog_types.loc * string ]
+    
+  type compiler_msg_parser = string -> 
+    [ `Loc of string * int * int * string | `Unparsed of string  ]
+    
+  type msg = 
+    [ `Compiler of compiler_msg list
+    | `Linker of string list 
+    | `Missing_attr of prim * string 
+    | `Unsupported_shaders of prog * Prog_types.shader list 
+    | `Msg of string ]
+    
+  type level = [ `Error | `Debug ] 
+  type t = level -> msg -> unit
+end
+
+type op = 
+  { count : int; 
+    effect : effect; 
+    uniforms : Uniform_types.set; 
+    tr : m4;
+    prim : prim; }
+
+
+module Renderer_types = struct
+  
+  type clears = 
+    { clear_color : color option; 
+      clear_depth : float option; 
+      clear_stencil : int option; }
+
+  module type T = sig
+    type t 
+    val name : string
+    val create : 
+      ?compiler_msg_parser:Log_types.compiler_msg_parser -> Log_types.t ->
+      debug:bool -> size2 -> t
+    val size : t -> size2
+    val set_size : t -> size2 -> unit
+    val view : t -> view
+    val set_view : t -> view -> unit
+    val clears : t -> clears 
+    val set_clears : t -> clears -> unit
+    val fbuf : t -> fbuf 
+    val set_fbuf : t -> fbuf -> unit
+    val add_op : t -> op -> unit
+    val render : t -> clear:bool -> unit
+    val release : t -> unit
+      
+    module Cap : sig
+      val shader_kinds : t -> Prog_types.shader_kind list
+      val gl_version : t ->
+        [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
+      val glsl_version : t ->
+        [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
+      val gl_renderer : t -> string 
+      val gl_vendor : t -> string 
+
+      type caps =
+        { c_max_samples : int;
+          c_max_tex_size : int;
+          c_max_render_buffer_size : int; }
+        
+      val caps : t -> caps 
+    end
+
+    module Fbuf : sig 
+      type read_buf = 
+        [ `Color_r of int 
+        | `Color_g of int 
+        | `Color_b of int 
+        | `Color_rgb of int 
+        | `Color_rgba of int
+        | `Depth
+        | `Stencil 
+        | `Depth_stencil ]
+        
+      val async_read : t -> fbuf -> read_buf -> pos:p2 -> size:size2 -> 
+        buf -> unit
+
+      val complete : t -> fbuf -> 
+        [ `Complete
+        | `Incomplete_attachement
+        | `Incomplete_draw_buffer
+        | `Incomplete_layer_targets
+        | `Incomplete_missing_attachement
+        | `Incomplete_multisample
+        | `Incomplete_read_buffer
+        | `Undefined
+        | `Unsupported ]
+    end
+
+    module Buf : sig
+      val sync_cpu_to_gpu : t -> buf -> unit
+      val sync_gpu_to_cpu : t -> buf -> unit
+      val map : t -> [ `R | `W | `RW ]  -> buf -> 
+        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
+      val unmap : t -> buf -> unit
+    end
+  end
+
+  
+  type t = R : (module T with type t = 'a) * 'a -> t
+end
+
+type renderer = Renderer_types.t
+
+
 (* Buffers *) 
 
 module Buf = struct
+
+  include Buf_types
 
   (* FIXME: this module has two uses of Obj.magic. It will be 
      possible to eliminate all of them once we have GADTs for bigarray 
      kinds. http://caml.inria.fr/mantis/view.php?id=6064 *) 
         
   (* Buffers *) 
-
-  type usage = 
-    [ `Static_draw | `Static_read | `Static_copy
-    | `Stream_draw | `Stream_read | `Stream_copy
-    | `Dynamic_draw | `Dynamic_read | `Dynamic_copy ]
 
   let pp_usage ppf u = pp ppf begin match u with
     | `Static_draw -> "static-draw"
@@ -83,8 +479,6 @@ module Buf = struct
     | `Dynamic_copy -> "dynamic-copy"
     end
       
-  type bigarray_any = Ba : ('a, 'b) bigarray -> bigarray_any
-
   let create_bigarray_any scalar_type count = match scalar_type with
   | `Int8 -> Ba (Ba.create Ba.Int8 count) 
   | `Int16 -> Ba (Ba.create Ba.Int16 count)
@@ -97,21 +491,6 @@ module Buf = struct
   | `Float16 -> Ba (Ba.create Ba.Float16 count)
   | `Float32 -> Ba (Ba.create Ba.Float32 count)
   | `Float64 -> Ba (Ba.create Ba.Float64 count)
-
-  type ('a, 'b) init = 
-    [ Gg.buffer
-    | `Cpu of Ba.scalar_type * int
-    | `Gpu of Ba.scalar_type * int ]
-
-  type t = 
-    { usage : usage; 
-      scalar_type : Ba.scalar_type;
-      mutable gpu_count : int;     
-      mutable gpu_exists : bool;   
-      mutable gpu_upload : bool;
-      mutable cpu_autorelease : bool;
-      mutable cpu : bigarray_any option; 
-      mutable info : Info.t; }
     
   let create ?(cpu_autorelease = true) ?(usage = `Static_draw) init =
     let create scalar_type ?(gpu_count = 0) cpu = 
@@ -215,14 +594,8 @@ end
 
 module Attr = struct
   
-  type t = 
-    { name : string; 
-      dim : int; 
-      buf : Buf.t; 
-      stride : int; 
-      first : int; 
-      normalize : bool; }
-
+  include Attr_types 
+  
   let create ?(normalize = false) ?stride ?(first = 0) name ~dim buf = 
     let stride = match stride with None -> dim | Some stride -> stride in
     if dim < 1 || dim > 4 then invalid_arg (err_attr_dim dim) else
@@ -252,14 +625,7 @@ end
 
 module Prim = struct 
 
-  (* Primitive kinds *) 
-  
-  type kind = 
-    [ `Points 
-    | `Lines | `Line_strip | `Line_loop | `Lines_adjacency 
-    | `Line_strip_adjacency 
-    | `Triangles | `Triangle_strip | `Triangle_fan
-    | `Triangles_adjacency | `Triangle_strip_adjacency ]
+  include Prim_types 
     
   let pp_kind ppf kind = pp ppf begin match kind with 
     | `Points -> "points"
@@ -276,18 +642,6 @@ module Prim = struct
     end
  
   (* Primitives *) 
-      
-  module Smap = Map.Make(String) 
-      
-  type t = 
-    { tr : M4.t; 
-      name : string;
-      first : int;
-      count : int option; 
-      index : Buf.t option;
-      kind : kind; 
-      attrs : Attr.t Smap.t; 
-      mutable info : Info.t; }
 
   let gen_name =
     let count = ref 0 in 
@@ -367,16 +721,12 @@ end
 
 module Tex = struct
   
-  type wrap = [ `Repeat | `Mirrored_repeat | `Clamp_to_edge ]
+  include Tex_types 
+
   let pp_wrap ppf w = pp ppf begin match w with 
     | `Repeat -> "repeat" | `Mirrored_repeat -> "mirrored-repeat" 
     | `Clamp_to_edge -> "clamp-to-edge" 
     end
-
-  type mag_filter = [ `Linear | `Nearest ]
-  type min_filter = 
-    [ `Linear | `Linear_mipmap_linear | `Linear_mipmap_nearest
-    | `Nearest | `Nearest_mipmap_linear | `Nearest_mipmap_nearest ]
 
   let pp_min_filter ppf m = pp ppf begin match m with 
     | `Linear -> "linear" | `Linear_mipmap_linear -> "linear-mipmap-linear"
@@ -388,23 +738,10 @@ module Tex = struct
       
   let pp_mag_filter = pp_min_filter
 
-  type kind = [ `D1 | `D2 | `D3 | `D2_ms | `D3_ms | `Buffer ]
-
   let pp_kind ppf k = pp ppf begin match k with 
     | `D1 -> "D1" | `D2 -> "D2" | `D3 -> "D3" | `D2_ms -> "D2_ms" 
     | `D3_ms -> "D3_ms" | `Buffer -> "Buffer"
     end
-
-  type sample_format = 
-    [ `D1 of Ba.scalar_type * bool 
-    | `D2 of Ba.scalar_type * bool 
-    | `D3 of Ba.scalar_type * bool 
-    | `D4 of Ba.scalar_type * bool
-    | `SRGB of [ `UInt8 ]
-    | `SRGBA of [ `UInt8 ]
-    | `Depth of [ `UInt16 | `UInt24 | `Float32 ]
-    | `Stencil of [ `UInt8 ]
-    | `Depth_stencil of [ `UInt24_UInt8 | `Float32_UInt8 ] ]
 
   let pp_norm ppf b = pp ppf (if b then "normalized" else "integral")
   let pp_sample_format ppf (sf : sample_format) = match sf with
@@ -434,14 +771,6 @@ module Tex = struct
         | `UInt24_UInt8 -> "uint24 uint8"
         | `Float32_UInt8 -> "float32 uint8"
         end
-
-  type init =
-    [ `D1 of sample_format * float * Buf.t option
-    | `D2 of sample_format * size2 * Buf.t option
-    | `D3 of sample_format * size3 * Buf.t option
-    | `D2_ms of sample_format * size2 * int * bool 
-    | `D3_ms of sample_format * size3 * int * bool 
-    | `Buffer of sample_format * Buf.t ]
 
   let pp_buf_opt ppf = function 
   | None -> pp ppf "nobuf" 
@@ -503,22 +832,6 @@ module Tex = struct
         let buf = match buf with Some buf -> buf | None -> assert false in
         `Buffer (sample_format, buf)
     | `D2_ms | `D3_ms -> invalid_arg err_mstex
-
-  type t = 
-    { kind : kind; 
-      sample_format : sample_format; 
-      mutable size : size3;
-      mutable buf : Buf.t option;
-      mutable buf_autorelease : bool;
-      mutable gpu_update : bool; 
-      mutable wrap_s : wrap;
-      mutable wrap_t : wrap;
-      mutable wrap_r : wrap;
-      mutable mipmaps : bool; 
-      mutable multisample : (int * bool) option;
-      mutable min_filter : min_filter; 
-      mutable mag_filter : mag_filter; 
-      mutable info : Info.t; }
     
   let nil = 
     { kind = `D1; 
@@ -606,39 +919,9 @@ end
 
 module Uniform = struct
 
+  include Uniform_types 
+
   (* Uniform values *) 
-
-  type 'a value = 
-    | Bool : bool -> bool value
-    | Int : int -> int value 
-    | Float : float -> float value
-    | V2 : v2 -> v2 value 
-    | V3 : v3 -> v3 value 
-    | V4 : v4 -> v4 value 
-    | M2 : m2 -> m2 value
-    | M3 : m3 -> m3 value
-    | M4 : m4 -> m4 value
-    | Tex : Tex.t -> Tex.t value
-    | Model_to_world : m4 value
-    | Model_to_view : m4 value 
-    | Model_to_clip : m4 value 
-    | Model_normal_to_view : m3 value 
-    | World_to_view : m4 value
-    | World_to_clip : m4 value 
-    | View_to_clip : m4 value 
-    | Viewport_o : v2 value
-    | Viewport_size : v2 value
-
-  type builtin = 
-    [ `Model_to_world 
-    | `Model_to_view 
-    | `Model_to_clip 
-    | `Model_normal_to_view 
-    | `World_to_view 
-    | `World_to_clip 
-    | `View_to_clip
-    | `Viewport_o
-    | `Viewport_size ]
 
   let pp_builtin ppf b = pp ppf begin match b with 
     | `Model_to_world -> "model_to_world"
@@ -651,19 +934,6 @@ module Uniform = struct
     | `Viewport_o -> "viewport_o"
     | `Viewport_size -> "viewport_size"
     end
-
-  type value_untyped = 
-    [ `Bool of bool 
-    | `Int of int 
-    | `Float of float 
-    | `V2 of v2 
-    | `V3 of v3 
-    | `V4 of v4 
-    | `M2 of m2
-    | `M3 of m3
-    | `M4 of m4 
-    | `Tex of Tex.t
-    | `Builtin of builtin ]
 
   let untype : type a. a value -> value_untyped = function
   | Bool b -> `Bool b
@@ -721,8 +991,6 @@ module Uniform = struct
   | `Builtin b -> pp_builtin ppf b
 
   (* Uniforms *) 
-
-  type 'a t = string * 'a value * ('a -> value_untyped) 
 
   let u name v = name, v, (untype_fun v)
   let name (n, _, _) = n 
@@ -807,10 +1075,6 @@ module Uniform = struct
   let viewport_size n = let v = Viewport_size in (n, v, untype_fun v)
 
   (* Uniform sets *)
-
-  module Smap = Map.Make(String) 
-
-  type set = value_untyped Smap.t 
     
   let empty = Smap.empty 
   let is_empty = Smap.is_empty
@@ -841,9 +1105,9 @@ end
 
 module Prog = struct
 
-  (* Source locations. *) 
+  include Prog_types 
 
-  type loc = [ `Loc of string * int | `Unknown ] 
+  (* Source locations. *) 
 
   let pp_loc ppf = function 
   | `Unknown -> pp ppf "????:??" 
@@ -864,8 +1128,6 @@ module Prog = struct
   
   (* Inserts *) 
 
-  type insert = loc * string 
-
   let insert ?loc src = 
     let stack = Printexc.get_callstack 2 in
     let loc = match loc with 
@@ -876,12 +1138,6 @@ module Prog = struct
 
   (* Shaders *) 
 
-  type lang = [ `GLSL of int | `GLSL_ES of int ] 
-
-  type shader_kind = 
-    [ `Vertex | `Tess_control | `Tess_evaluation | `Geometry
-    | `Fragment | `Compute ]
-
   let pp_shader_kind ppf sk = pp ppf begin match sk with 
     | `Vertex -> "vertex"
     | `Tess_control -> "tess_control"
@@ -890,11 +1146,6 @@ module Prog = struct
     | `Fragment -> "fragment"
     | `Compute -> "compute"
     end
-
-  type shader = 
-    { kind : shader_kind; 
-      lang : lang option;
-      srcs : (loc * string) list (* list is reversed *); }
 
   let shader ?lang ?loc ?(inserts = []) kind src =
     let stack = Printexc.get_callstack 2 in
@@ -907,8 +1158,6 @@ module Prog = struct
   let kind s = s.kind
   let loc s = fst (List.hd s.srcs) 
   let lang s = s.lang
-
-  type source = string * (int * string) list 
   
   let source ?lang s =
     let lang = match lang with None -> s.lang | Some _ as lang -> lang in
@@ -932,12 +1181,6 @@ module Prog = struct
   let gen_name =
     let count = ref 0 in 
     fun () -> incr count; Printf.sprintf "prog%d" !count
-
-  type t = 
-    { name : string; 
-      shaders : shader list; 
-      uset : Uniform.set;
-      mutable info : Info.t }
       
   let create ?(name = gen_name ()) ?(uset = Uniform.empty) shaders = 
     { name; shaders; uset; info = Info.none }
@@ -954,7 +1197,10 @@ end
 
 module View = struct
 
+  include View_types 
+
   (* View and projection matrices *)
+
 
   type fov = [ `H of float | `V of float ]
 
@@ -983,8 +1229,6 @@ module View = struct
       0.          0.        0.         1.       
 
   (* View *) 
-
-  type t = { mutable tr : m4; mutable proj : m4; mutable viewport : box2 }
 
   let create ?(tr = M4.id) ?(proj = persp (`H Float.pi_div_4) 1.5 1. 100.) 
       ?(viewport = Box2.unit) () = { tr; proj; viewport }
@@ -1020,23 +1264,14 @@ module View = struct
 end
 
 module Effect = struct  
+  
+  include Effect_types
 
   (* Rasterization state *) 
  
-  type raster_face_cull = [ `Front | `Back ] 
-  type raster = { raster_face_cull : raster_face_cull option } 
   let raster_default = { raster_face_cull = None } 
 
   (* Depth state *) 
-
-  type depth_test = 
-    [ `Never | `Less | `Equal | `Lequal | `Greater | `Nequal | `Gequal 
-    | `Always ]
-
-  type depth = 
-    { depth_test : depth_test option; 
-      depth_write : bool;
-      depth_offset : float * float; }
 
   let depth_default = 
     { depth_test = Some `Less; 
@@ -1044,30 +1279,6 @@ module Effect = struct
       depth_offset = (0., 0.) }
 
   (* Blend state *) 
-
-  type blend_mul = 
-    [ `Zero | `One
-    | `Src | `One_minus_src
-    | `Src_a | `One_minus_src_a | `Src_a_saturate
-    | `Src1 | `One_minus_src1
-    | `Src1_a | `One_minus_src1_a
-    | `Dst | `One_minus_dst
-    | `Dst_a | `One_minus_dst_a
-    | `Cst | `One_minus_cst
-    | `Cst_a | `One_minus_cst_a ]
-
-  type blend_eq = 
-    [ `Add of blend_mul * blend_mul 
-    | `Sub of blend_mul * blend_mul 
-    | `Rev_sub of blend_mul * blend_mul
-    | `Min 
-    | `Max ]
-
-  type blend =  
-    { blend : bool;
-      blend_rgb : blend_eq;
-      blend_a : blend_eq;
-      blend_cst : color; }
 
   let blend_eq_default = `Add (`Src_a, `One_minus_src_a)
   let blend_default = 
@@ -1079,14 +1290,6 @@ module Effect = struct
   let blend_alpha = { blend_default with blend = true } 
 
   (* Effect *) 
-
-  type t = 
-    { raster : raster; 
-      depth : depth;
-      blend : blend;
-      prog : Prog.t; 
-      mutable uniforms : Uniform.set; 
-      mutable info : Info.t; } 
 
   let create 
       ?(raster = raster_default) ?(depth = depth_default) 
@@ -1112,20 +1315,12 @@ module Effect = struct
   let set_info e i = e.info <- i
 end
 
-type op = { count : int; effect : Effect.t; uniforms : Uniform.set; 
-            tr : m4; prim : Prim.t }
-
-
 module Fbuf = struct
 
   (** Render buffers. *) 
   module Rbuf = struct
+    include Rbuf_types
     
-    type t = { multisample : int option; 
-               size : size2; 
-               sample_format : Tex.sample_format; 
-               mutable info : Info.t }
-  
     let create ?multisample size sample_format = 
       { multisample; size; sample_format; info = Info.none }
 
@@ -1135,16 +1330,9 @@ module Fbuf = struct
     let info b = b.info
     let set_info b i = b.info <- i
   end
-  
-  type image = 
-    [ `Tex of int * Tex.t | `Tex_layer of int * int * Tex.t | `Rbuf of Rbuf.t ] 
-  
-  type attachement = 
-    [ `Color of int * image 
-    | `Depth of image | `Stencil of image | `Depth_stencil of image ]
 
-  type t = { attachements : attachement list; mutable info : Info.t }
-
+  include Fbuf_types 
+  
   let default = { attachements = []; info = Info.none }
   let create attachements = { attachements; info = Info.none }
   let attachements f = f.attachements
@@ -1154,9 +1342,12 @@ end
 
 
 module Renderer = struct
+  include Renderer_types 
 
   module Log = struct
-    
+
+    include Log_types 
+
     let split_string sep s =                                (* damned... *) 
       let rec split accum j = 
         let i = try (String.rindex_from s j sep) with Not_found -> -1 in
@@ -1174,15 +1365,9 @@ module Renderer = struct
 
     (* Compiler messages *) 
 
-    type compiler_msg = 
-      [ `Msg of string | `Msg_loc of string * Prog.loc * string ]
-
     let pp_compiler_msg ppf = function 
     |  `Msg m -> pp ppf "@[%s@]" m 
     |  `Msg_loc (t, loc, m) -> pp ppf "@[%s:%a: %s@]" t Prog.pp_loc loc m
-
-    type compiler_msg_parser = string -> 
-      [ `Loc of string * int * int * string | `Unparsed of string  ]
     
     let compiler_msg_parser_default l =
       let locify l pre file line rest = 
@@ -1213,13 +1398,6 @@ module Renderer = struct
 
     (* Renderer messages *) 
 
-    type msg = 
-      [ `Compiler of compiler_msg list
-      | `Linker of string list 
-      | `Missing_attr of Prim.t * string 
-      | `Unsupported_shaders of Prog.t * Prog.shader list 
-      | `Msg of string ]
-
     let pp_msg ppf (msg : msg) = match msg with
     | `Compiler msgs -> pp ppf "@[<v>%a@]" (pp_list pp_compiler_msg) msgs 
     | `Linker msgs -> pp ppf "@[<v>%a@]" (pp_list pp_str) msgs
@@ -1237,129 +1415,20 @@ module Renderer = struct
 
     (* Logs *) 
 
-    type level = [ `Error | `Debug ] 
-    type t = level -> msg -> unit
-
     let of_formatter ppf level msg = pp ppf "%a@." pp_msg msg 
   end
-
-  (* TODO remove that ? *) 
-  module Stat = struct
-    type t = 
-      { mutable ops : int;
-        mutable max_ops : int;
-        mutable vertices : int; 
-        mutable max_vertices : int;
-        mutable faces : int; 
-        mutable max_faces : int; }
-      
-    let stats = 
-      { ops = 0; 
-        max_ops = 0; 
-        vertices = 0; 
-        max_vertices = 0; 
-        faces = 0; 
-        max_faces = 0; }
-      
-    let begin_stats stats now =
-      stats.ops <- 0;
-      stats.vertices <- 0;
-      stats.faces <- 0
-        
-    let end_stats s now = 
-      if s.ops > s.max_ops then s.max_ops <- s.ops;
-      if s.vertices > s.max_vertices then s.max_vertices <- s.vertices; 
-      if s.faces > s.max_faces then s.max_faces <- s.faces
-  end
   
-  type clears = 
-    { clear_color : color option; 
-      clear_depth : float option; 
-      clear_stencil : int option; }
-
   let clears_default = 
     { clear_color = Some Color.black;
       clear_depth = Some 1.; 
       clear_stencil = None; }
-                         
-  module type T = sig
-    type t 
-    val name : string
-    val create : 
-      ?compiler_msg_parser:Log.compiler_msg_parser -> Log.t -> debug:bool -> 
-      size2 -> t
-    val size : t -> size2
-    val set_size : t -> size2 -> unit
-    val view : t -> View.t 
-    val set_view : t -> View.t -> unit
-    val clears : t -> clears 
-    val set_clears : t -> clears -> unit
-    val add_op : t -> op -> unit
-    val fbuf : t -> Fbuf.t
-    val set_fbuf : t -> Fbuf.t -> unit
-    val render : t -> clear:bool -> unit
-    val release : t -> unit
-
-    module Cap : sig
-      val shader_kinds : t -> Prog.shader_kind list
-      val gl_version : t ->
-        [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
-      val glsl_version : t ->
-        [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
-      val gl_renderer : t -> string 
-      val gl_vendor : t -> string 
-
-      type caps =
-        { c_max_samples : int;
-          c_max_tex_size : int;
-          c_max_render_buffer_size : int; }
-        
-      val caps : t -> caps 
-    end
-
-    module Fbuf : sig 
-      type read_buf = 
-        [ `Color_r of int 
-        | `Color_g of int 
-        | `Color_b of int 
-        | `Color_rgb of int 
-        | `Color_rgba of int
-        | `Depth
-        | `Stencil 
-        | `Depth_stencil ]
-        
-      val async_read : t -> Fbuf.t -> read_buf -> pos:p2 -> size:size2 -> 
-        Buf.t -> unit
-
-      val complete : t -> Fbuf.t -> 
-        [ `Complete
-        | `Incomplete_attachement
-        | `Incomplete_draw_buffer
-        | `Incomplete_layer_targets
-        | `Incomplete_missing_attachement
-        | `Incomplete_multisample
-        | `Incomplete_read_buffer
-        | `Undefined
-        | `Unsupported ]
-    end
-
-    module Buf : sig
-      val sync_cpu_to_gpu : t -> Buf.t -> unit
-      val sync_gpu_to_cpu : t -> Buf.t -> unit
-      val map : t -> [ `R | `W | `RW ]  -> Buf.t -> 
-        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
-      val unmap : t -> Buf.t -> unit
-    end
-  end
-  
+                           
   let op ?(count = 1) ?(uniforms = Uniform.empty) ?(tr = M4.id) effect prim = 
     { count; effect; uniforms; tr; prim }
 
   let nop = { count = 1; effect = Effect.create (Prog.create []); 
               uniforms = Uniform.empty; tr = M4.id; 
               prim = Prim.create ~count:0 `Triangles [] }
-
-  type t = R : (module T with type t = 'a) * 'a -> t
     
   let stdlog = Log.of_formatter Format.err_formatter 
   let create ?compiler_msg_parser ?(log = stdlog) ?(debug = false) ~size 
@@ -1463,17 +1532,6 @@ module Renderer = struct
     let complete (R ((module R), r)) fbuf = R.Fbuf.complete r fbuf
   end
 end
-
-type buf = Buf.t
-type attr = Attr.t
-type prim = Prim.t
-type tex = Tex.t
-type 'a uniform = 'a Uniform.t
-type prog = Prog.t
-type effect = Effect.t
-type view = View.t
-type fbuf = Fbuf.t
-type renderer = Renderer.t
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2014 Daniel C. Bünzli.

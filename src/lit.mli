@@ -13,6 +13,9 @@
     Open the module to use it, this defines only modules and types 
     in your scope.
 
+    {b Note.} Any functions that doesn't take a renderer value 
+    can be used safely even if there's no renderer setup.
+
     {e Release %%VERSION%% — %%MAINTAINER%% } *) 
 
 (** {1:bufs Buffers}  *) 
@@ -31,7 +34,7 @@ type buf
     Some functions on buffers need a renderer, see {!Renderer.Buf}. *)
 module Buf : sig
   
-  (** {1 Buffers} *) 
+  (** {1 Buffer usage} *) 
 
   type usage = 
     [ `Static_draw | `Static_read | `Static_copy
@@ -52,6 +55,8 @@ module Buf : sig
   val pp_usage : Format.formatter -> usage -> unit
   (** [pp_usage ppf usage] prints an uspecified representation of [usage] on 
       [ppf]. *) 
+
+  (** {1 Buffers} *) 
 
   type ('a, 'b) init = 
     [ Gg.buffer
@@ -95,6 +100,11 @@ module Buf : sig
   val scalar_type : buf -> Ba.scalar_type
   (** [scalar_type b] is the scalar type of [b]. *) 
 
+  val pp : Format.formatter -> buf -> unit
+  (** [pp ppf b] prints an unspecified representation of [b] on [ppf]. *)
+
+  (** {1 GPU buffer} *) 
+
   val gpu_count : buf -> int
   (** [gpu_count b] is the number of scalars in the GPU buffer of [b]. *) 
 
@@ -111,6 +121,8 @@ module Buf : sig
 
       {b Warning} If {!cpu} is [None] at the time of upload this will zero 
       any existing data on the GPU buffer. *) 
+
+  (** {1 CPU buffer} *) 
 
   val cpu_count : buf -> int
   (** [cpu_count b] is the number of scalars in the CPU buffer of [b]. *)
@@ -150,8 +162,6 @@ module Buf : sig
   val set_cpu_autorelease : buf -> bool -> unit
   (** [set_cpu_autorelease b bool] sets the autorelease behaviour to [bool]. *)
 
-  val pp : Format.formatter -> buf -> unit
-  (** [pp ppf b] prints an unspecified representation of [b] on [ppf]. *)
 end
 
 (** {1:prims Primitives} *) 
@@ -1304,7 +1314,6 @@ module Renderer : sig
 
   (** {1:ops Render operations} *) 
 
-  
   val op : ?count:int -> ?uniforms:Uniform.set -> ?tr:m4 -> effect -> prim -> op
   (** [op count uniforms tr e p] is a render op. [count] defaults to 1. 
       [uniforms] defaults to {!Uniform.empty}, [tr] to {!M4.id}. *)
@@ -1312,104 +1321,61 @@ module Renderer : sig
   val nop : op 
   (** [nop] is a render no-op, it has no effect on the renderer. *) 
 
-  (** {1:renderers Renderers} *)
+  val add_op : renderer -> op -> unit
+  (** [add_op r o] adds render operation [o] on [r]. *) 
 
-  type clears = 
-    { clear_color : color option; 
-      clear_depth : float option; 
-      clear_stencil : int option; }
-
-  val clears_default : clears
-
-  (** The type for a renderer backend. *) 
-  module type T = sig
-    type t 
-    val name : string
-    val create : 
-      ?compiler_msg_parser:Log.compiler_msg_parser -> Log.t -> debug:bool -> 
-      size2 -> t
-    val size : t -> size2
-    val set_size : t -> size2 -> unit
-    val view : t -> View.t 
-    val set_view : t -> View.t -> unit
-    val clears : t -> clears 
-    val set_clears : t -> clears -> unit
-    val add_op : t -> op -> unit
-    val fbuf : t -> fbuf 
-    val set_fbuf : t -> fbuf -> unit
-    val render : t -> clear:bool -> unit
-    val release : t -> unit
-
-    module Cap : sig
-      val shader_kinds : t -> Prog.shader_kind list
-      val gl_version : t ->
-        [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
-      val glsl_version : t ->
-        [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
-      val gl_renderer : t -> string 
-      val gl_vendor : t -> string 
-
-      type caps = 
-        { c_max_samples : int;
-          c_max_tex_size : int; 
-          c_max_render_buffer_size : int; }
-
-      val caps : t -> caps 
-    end
-
-    module Fbuf : sig 
-      type read_buf = 
-        [ `Color_r of int 
-        | `Color_g of int 
-        | `Color_b of int 
-        | `Color_rgb of int 
-        | `Color_rgba of int
-        | `Depth
-        | `Stencil 
-        | `Depth_stencil ]
-      
-      val async_read : t -> Fbuf.t -> read_buf -> pos:p2 -> size:size2 -> 
-        buf -> unit
-      
-      val complete : t -> Fbuf.t -> 
-        [ `Complete
-        | `Incomplete_attachement
-        | `Incomplete_draw_buffer
-        | `Incomplete_layer_targets
-        | `Incomplete_missing_attachement
-        | `Incomplete_multisample
-        | `Incomplete_read_buffer
-        | `Undefined
-        | `Unsupported ]      
-    end 
-
-    module Buf : sig
-      val sync_cpu_to_gpu : t -> Buf.t -> unit
-      val sync_gpu_to_cpu : t -> Buf.t -> unit
-      val map : t -> [ `R | `W | `RW ]  -> Buf.t -> 
-        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
-      val unmap : t -> Buf.t -> unit
-    end
-  end
-  
-  type t = renderer 
-  (** The type for renderers. *)
-
-  val create : ?compiler_msg_parser:Log.compiler_msg_parser -> 
-    ?log:Log.t -> ?debug:bool -> size:size2 -> (module T) -> renderer
+  (** {1 Window geometry and projection} *)
 
   val size : renderer -> size2
   val set_size : renderer -> size2 -> unit
   val view : renderer -> View.t
   val set_view : renderer -> View.t -> unit
-  val clears : t -> clears 
-  val set_clears : t -> clears -> unit
-  val add_op : renderer -> op -> unit
+
+  (** {1 Framebuffers} *) 
+    
   val fbuf : renderer -> fbuf
+  (** [fbuf r] is the framebuffer on which render ops are performed. *)
+    
   val set_fbuf : renderer -> fbuf -> unit
-  val render : ?clear:bool -> renderer -> unit
-  val release : renderer -> unit
-  
+  (** [set_fbuf r fbuf] sets the framebuffer to [fbuf]. *) 
+    
+  (** Renderer specific framebuffer functions. *) 
+  module Fbuf : sig 
+    
+    type read_buf = 
+      [ `Color_r of int 
+      | `Color_g of int 
+      | `Color_b of int 
+      | `Color_rgb of int 
+      | `Color_rgba of int
+      | `Depth
+      | `Stencil 
+      | `Depth_stencil ]
+    (** The type for framebuffer buffer read. For color components the
+        integer denotes the color attachement.  *) 
+
+    val async_read : renderer -> Fbuf.t -> read_buf -> pos:p2 -> size:size2 -> 
+      buf -> unit
+    (** [async_read t f fmt buf] asynchronously reads the contents of 
+        framebuffer [f] according to [fmt]
+        and stores the result in [buf]. 
+
+        @raise Invalid_argument if [`Depth_stencil] is used and 
+        the scalar type of [buf] is not `UInt32 (the data is packed
+        as 24 bits of depth and 8 bits of stencil). *)
+      
+    val complete : renderer -> Fbuf.t -> 
+      [ `Complete
+      | `Incomplete_attachement
+      | `Incomplete_draw_buffer
+      | `Incomplete_layer_targets
+      | `Incomplete_missing_attachement
+      | `Incomplete_multisample
+      | `Incomplete_read_buffer
+      | `Undefined
+      | `Unsupported ]      
+  end
+
   (** Renderer capabilities. *)
   module Cap : sig
 
@@ -1455,7 +1421,9 @@ module Renderer : sig
   (** Renderer specific buffer functions. *)
   module Buf : sig
 
-    (** {1 Buffer synchronisation} *) 
+    (** {1 Buffer synchronisation} 
+
+        {b Note} These functions may block. *)
 
     val sync_cpu_to_gpu : renderer -> buf -> unit 
     (** [sync_cpu_to_gpu r b] uploads the CPU buffer of [b] to the GPU buffer. 
@@ -1495,50 +1463,118 @@ module Renderer : sig
         result in program termination. *)
   end
 
-  (** Renderer specific framebuffer functions. *) 
-  module Fbuf : sig 
-    
-    type read_buf = 
-      [ `Color_r of int 
-      | `Color_g of int 
-      | `Color_b of int 
-      | `Color_rgb of int 
-      | `Color_rgba of int
-      | `Depth
-      | `Stencil 
-      | `Depth_stencil ]
-    (** The type for framebuffer buffer read. For color components the
-        integer denotes the color attachement.  *) 
-
-    val async_read : t -> Fbuf.t -> read_buf -> pos:p2 -> size:size2 -> 
-      buf -> unit
-    (** [async_read t f fmt buf] asynchronously reads the contents of 
-        framebuffer [f] according to [fmt]
-        and stores the result in [buf]. 
-
-        @raise Invalid_argument if [`Depth_stencil] is used and 
-        the scalar type of [buf] is not `UInt32 (the data is packed
-        as 24 bits of depth and 8 bits of stencil). *)
+ 
+  (** {1 Framebuffer clearing.} 
       
-    val complete : t -> Fbuf.t -> 
-      [ `Complete
-      | `Incomplete_attachement
-      | `Incomplete_draw_buffer
-      | `Incomplete_layer_targets
-      | `Incomplete_missing_attachement
-      | `Incomplete_multisample
-      | `Incomplete_read_buffer
-      | `Undefined
-      | `Unsupported ]      
+      {b TODO} shouldn't we move that to Fbuf and Renderer.Fbuf.
+  *) 
+
+  type clears = 
+    { clear_color : color option; 
+      clear_depth : float option; 
+      clear_stencil : int option; }
+
+  val clears_default : clears  
+  val clears : renderer -> clears
+  val set_clears : renderer -> clears -> unit
+(*  val clear : renderer -> unit  *)
+
+  (** {1 Rendering} *) 
+
+  val render : ?clear:bool -> renderer -> unit
+  (** [render clear r] renders the added operations. If [clear] is 
+      [true] (default) the buffers are cleared before rendering. *) 
+
+  (** {1 Creating} *) 
+
+  (** The type for a renderer backend. *) 
+  module type T = sig
+    type t 
+    val name : string
+    val create : 
+      ?compiler_msg_parser:Log.compiler_msg_parser -> Log.t -> debug:bool -> 
+      size2 -> t
+    val size : t -> size2
+    val set_size : t -> size2 -> unit
+    val view : t -> View.t
+    val set_view : t -> View.t -> unit
+    val clears : t -> clears 
+    val set_clears : t -> clears -> unit
+    val fbuf : t -> fbuf 
+    val set_fbuf : t -> fbuf -> unit
+    val add_op : t -> op -> unit
+    val render : t -> clear:bool -> unit
+    val release : t -> unit
+
+    module Cap : sig
+      val shader_kinds : t -> Prog.shader_kind list
+      val gl_version : t ->
+        [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
+      val glsl_version : t ->
+        [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
+      val gl_renderer : t -> string 
+      val gl_vendor : t -> string 
+
+      type caps = 
+        { c_max_samples : int;
+          c_max_tex_size : int; 
+          c_max_render_buffer_size : int; }
+
+      val caps : t -> caps 
+    end
+
+    module Fbuf : sig 
+      type read_buf = 
+        [ `Color_r of int 
+        | `Color_g of int 
+        | `Color_b of int 
+        | `Color_rgb of int 
+        | `Color_rgba of int
+        | `Depth
+        | `Stencil 
+        | `Depth_stencil ]
+      
+      val async_read : t -> fbuf -> read_buf -> pos:p2 -> size:size2 -> 
+        buf -> unit
+      
+      val complete : t -> fbuf -> 
+        [ `Complete
+        | `Incomplete_attachement
+        | `Incomplete_draw_buffer
+        | `Incomplete_layer_targets
+        | `Incomplete_missing_attachement
+        | `Incomplete_multisample
+        | `Incomplete_read_buffer
+        | `Undefined
+        | `Unsupported ]      
+    end 
+
+    module Buf : sig
+      val sync_cpu_to_gpu : t -> buf -> unit
+      val sync_gpu_to_cpu : t -> buf -> unit
+      val map : t -> [ `R | `W | `RW ]  -> buf -> 
+        ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
+      val unmap : t -> buf -> unit
+    end
   end
+
+  (** {1:renderers Renderers} *)
+  
+  type t = renderer
+  (** The type for renderers. *)
+
+  val create : 
+    ?compiler_msg_parser:Log.compiler_msg_parser -> 
+    ?log:Log.t -> 
+    ?debug:bool -> 
+    size:size2 -> 
+    (module T) -> 
+    renderer
+
+  val release : renderer -> unit
+  (** [release r] releases GPU resources associated to the renderer. *) 
 end
-
-(** {1 Remarks and tips} 
-
-    {ul 
-    {- For now, [Buf.t], [Geom.t] and [Effect] value should not be shared
-       across renderers.}
-    {- Note about OpenGL ids represented as [int]s.}} *) 
+  
 
 
 (*---------------------------------------------------------------------------
