@@ -909,7 +909,7 @@ module Effect : sig
   (** The type for depth state. *) 
 
   val depth_default : depth
-  (** [depth] is the default depth state:
+  (** [depth_default] is the default depth state:
       {ul 
       {- [depth_default.depth_test] is [Some `Less].}
       {- [depth_default.depth_write] is [true].}
@@ -1138,6 +1138,24 @@ end
 (** Framebuffers. *)
 module Fbuf : sig
 
+  (** {1 Clears} *) 
+
+  type clears = 
+    { clear_color : color option; 
+      clear_depth : float option; 
+      clear_stencil : int option; }
+  (** The type for framebuffer clears. If a field is [None] the corresponding
+      buffer is not cleared. *)
+
+  val clears_default : clears  
+  (** [clear_default] is the default clears: 
+      {ul 
+      {- [clears_default.clear_color] is [Some ]{!Color.void}} 
+      {- [clears_default.clear_depth] is [Some 1.]}
+      {- [clears_default.clear_stencil] is [None].}} *)
+
+  (** {1 Attachements} *) 
+  
   (** Render buffers. 
 
       Render buffers are images that can be attached to framebuffers
@@ -1145,30 +1163,32 @@ module Fbuf : sig
   module Rbuf : sig
     type t
     (** The type for render buffers. *)
-
+      
     val create : ?multisample:int -> size2 -> Tex.sample_format -> t
     (** [create mutisample size fmt] is an image with 
         size [size] and sample format [fmt]. [multisample] is the number
         of sample for multisample framebuffers. *)
-
+      
     val multisample : t -> int option 
     (** [multisample b] is [b]'s multisample value. *) 
-
+        
     val size2 : t -> size2 
     (** [size2 b] is [b]'s size. *) 
-
+      
     val sample_format : t -> Tex.sample_format 
     (** [sample_format b] is [b]'s sample format. *) 
   end
-
+  
   type image = 
     [ `Tex of int * tex | `Tex_layer of int * int * tex | `Rbuf of Rbuf.t ] 
-  (** The type for images. *) 
-  
+  (** The type for framebuffer images. *) 
+    
   type attachement = 
     [ `Color of int * image 
     | `Depth of image | `Stencil of image | `Depth_stencil of image ]
-  (** The type for image attachements. *) 
+  (** The type for framebuffer attachements. *) 
+
+  (** {1 Framebuffers} *) 
 
   type t = fbuf 
   (** The type for framebuffers. *) 
@@ -1176,12 +1196,22 @@ module Fbuf : sig
   val default : fbuf
   (** [default] is the default framebuffer. *) 
   
-  val create : attachement list -> fbuf 
+  val create : ?clears:clears -> attachement list -> fbuf
   (** [create attachements] is a framebuffer with attachements [attachments]. *)
 
   val attachements : fbuf -> attachement list 
-  (** [attachements f] is [f]'s attachements. *) 
-      
+  (** [attachements fb] is [fb]'s attachements. Irrelevant on {!default}. *) 
+
+  val clears : fbuf -> clears
+  (** [clears fb] is [fb]'s clears. *)
+
+  val set_clears : fbuf -> clears -> unit
+  (** [set_clears fb clears] sets [fb]'s clears to [clears]. *) 
+
+  val clear : renderer -> fbuf -> unit
+  (** [clear r fb] clears the framebuffer [fb] using [clears fb].  
+      Only [r]'s {!Renderer.view} viewport is affected. *)
+
   (** {1 Framebuffer status} *) 
 
   type status = 
@@ -1194,8 +1224,10 @@ module Fbuf : sig
     | `Incomplete_read_buffer
     | `Undefined
     | `Unsupported ]      
+  (** The type for frame buffer statuses. *) 
     
   val status : renderer -> fbuf -> status
+  (** [status r fb] is [fb]'s status. *) 
 
   (** {1 Framebuffer reading} *) 
   
@@ -1365,23 +1397,11 @@ module Renderer : sig
   val set_fbuf : renderer -> fbuf -> unit
   (** [set_fbuf r fbuf] sets the framebuffer to [fbuf]. *) 
      
-  (** {1 Clearing state} *)
-
-  type clears = 
-    { clear_color : color option; 
-      clear_depth : float option; 
-      clear_stencil : int option; }
-
-  val clears_default : clears  
-  val clears : renderer -> clears
-  val set_clears : renderer -> clears -> unit
-(*  val clear : renderer -> unit  *)
-
   (** {1 Rendering} *) 
 
   val render : ?clear:bool -> renderer -> unit
   (** [render clear r] renders the added operations. If [clear] is 
-      [true] (default) the buffers are cleared before rendering. *) 
+      [true] (default) the current framebuffer is cleared before rendering. *) 
 
   (** {1 Renderers} *) 
 
@@ -1500,6 +1520,7 @@ module Renderer : sig
     end
 
     module BFbuf : sig        
+      val clear : t -> fbuf -> unit
       val status : t -> fbuf -> Fbuf.status
       val read : t -> fbuf -> Fbuf.read -> pos:p2 -> size:size2 -> 
         buf -> unit
@@ -1513,8 +1534,6 @@ module Renderer : sig
     val set_size : t -> size2 -> unit
     val view : t -> View.t
     val set_view : t -> View.t -> unit
-    val clears : t -> clears 
-    val set_clears : t -> clears -> unit
     val fbuf : t -> fbuf 
     val set_fbuf : t -> fbuf -> unit
     val add_op : t -> op -> unit

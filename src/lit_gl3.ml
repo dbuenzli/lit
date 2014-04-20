@@ -118,16 +118,16 @@ type t =
     mutable log : Log.t; 
     mutable compiler_msg_parser : Log.compiler_msg_parser;
     mutable cleanups : (unit -> unit) list;
-    mutable clears : Renderer.clears;
     mutable raster : Effect.raster; (* Last setup raster state *) 
     mutable depth : Effect.depth;   (* Last setup depth state *) 
     mutable blend : Effect.blend;   (* Last setup blend state *)
+    mutable fbuf : fbuf;
     mutable size : size2;
     mutable view : view;
     mutable world_to_clip : m4 Lazy.t; (* cache *) 
     mutable 
       batches : op list Imap.t; (* maps programs ids to rendering operations *) 
-    mutable fbuf : fbuf; }
+    }
 
 let log_error r msg = r.log `Error msg 
 let log_debug r msg = r.log `Debug msg
@@ -1142,10 +1142,10 @@ module BFbuf = struct
   let finalise_binfo i =
     Gl_hi.delete_framebuffer i.id
 
-  let setup_binfo r f id = 
+  let setup_binfo r fb id = 
     let i = { id; } in 
     Gc.finalise finalise_binfo i;
-    set_binfo f i; 
+    set_binfo fb i; 
     i
 
   let attach r a = 
@@ -1166,38 +1166,70 @@ module BFbuf = struct
     | `Depth_stencil i -> attach Gl.depth_stencil_attachment i 
     | `Stencil i -> attach Gl.stencil i
 
-  let setup r f = 
-    if f == Fbuf.default then 0 else
-    match binfo f with 
+  let setup r fb = 
+    if fb == Fbuf.default then 0 else
+    match binfo fb with 
     | Some binfo -> binfo.id
     | None -> 
         let id = Gl_hi.gen_framebuffer () in
-        let _ = setup_binfo r f id in
+        let _ = setup_binfo r fb id in
         Gl.bind_framebuffer Gl.framebuffer id;
-        List.iter (attach r) (Fbuf.attachements f);
+        List.iter (attach r) (Fbuf.attachements fb);
         id
 
   let status_enum_to_variant = 
-    [ Gl.framebuffer_complete, `Complete;
-      Gl.framebuffer_undefined, `Undefined; 
-      Gl.framebuffer_incomplete_attachment, `Incomplete_attachement; 
-      Gl.framebuffer_incomplete_missing_attachment, 
-      `Incomplete_missing_attachement; 
-      Gl.framebuffer_incomplete_draw_buffer, `Incomplete_draw_buffer; 
-      Gl.framebuffer_incomplete_read_buffer, `Incomplete_read_buffer; 
-      Gl.framebuffer_unsupported, `Unsupported; 
-      Gl.framebuffer_incomplete_multisample, `Incomplete_multisample; 
-      Gl.framebuffer_incomplete_layer_targets, `Incomplete_layer_targets; ]
-
-  let status r fbuf = 
-    let id = setup r fbuf in 
+    Gl_hi.enum_map ~not_found:(fun e -> failwith "TODO") 
+      [ Gl.framebuffer_complete, `Complete;
+        Gl.framebuffer_undefined, `Undefined; 
+        Gl.framebuffer_incomplete_attachment, `Incomplete_attachement; 
+        Gl.framebuffer_incomplete_missing_attachment, 
+        `Incomplete_missing_attachement; 
+        Gl.framebuffer_incomplete_draw_buffer, `Incomplete_draw_buffer; 
+        Gl.framebuffer_incomplete_read_buffer, `Incomplete_read_buffer; 
+        Gl.framebuffer_unsupported, `Unsupported; 
+        Gl.framebuffer_incomplete_multisample, `Incomplete_multisample; 
+        Gl.framebuffer_incomplete_layer_targets, `Incomplete_layer_targets; ]
+     
+  let raw_clear clears = 
+    let clear_mask = ref 0 in
+    begin match clears.Fbuf.clear_color with 
+    | None -> () 
+    | Some c -> 
+        Gl.clear_color (Color.r c) (Color.g c) (Color.b c) (Color.a c);
+        clear_mask := Gl.(!clear_mask + color_buffer_bit)
+    end;
+    begin match clears.Fbuf.clear_depth with 
+    | None -> () 
+    | Some d -> 
+        Gl.clear_depth 1.; 
+        clear_mask := Gl.(!clear_mask + depth_buffer_bit)
+    end;
+    begin match clears.Fbuf.clear_stencil with
+    | None -> () 
+    | Some s -> 
+        Gl.clear_stencil s; 
+        clear_mask := Gl.(!clear_mask + stencil_buffer_bit)
+    end;
+    if !clear_mask <> 0 then Gl.clear !clear_mask
+        
+  let clear r fb = 
+    if r.fbuf == fb then raw_clear (Fbuf.clears fb) else 
+    let id = setup r fb in 
     Gl.bind_framebuffer Gl.framebuffer id; 
-    let s = Gl.check_framebuffer_status Gl.framebuffer in 
-    Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf);
-    try List.assoc s status_enum_to_variant with Not_found -> failwith "TODO"
+    raw_clear (Fbuf.clears fb); 
+    Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf)
 
-  let read r fbuf rb ~pos ~size buf = 
-    let fid = setup r fbuf in 
+  let raw_status () = 
+    status_enum_to_variant (Gl.check_framebuffer_status Gl.framebuffer)
+
+  let status r fb =
+    if r.fbuf == fb then raw_status () else
+    let id = setup r fb in 
+    Gl.bind_framebuffer Gl.framebuffer id; 
+    let status = raw_status () in  
+    Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf); status
+
+  let raw_read r fb rb ~pos ~size buf = 
     let bid = BBuf.setup r buf in
     let x = Float.int_of_round (V2.x pos) in 
     let y = Float.int_of_round (V2.y pos) in 
@@ -1205,7 +1237,7 @@ module BFbuf = struct
     let h = Float.int_of_round (Size2.h size) in
     let st = BBuf.(enum_of_scalar_type (Buf.scalar_type buf)) in
     let mode c = 
-      if fbuf == Fbuf.default then Gl.back else
+      if fb == Fbuf.default then Gl.back else
       Gl.color_attachment0 + c 
     in
     let fmt, st = match rb with 
@@ -1222,10 +1254,15 @@ module BFbuf = struct
     | `Stencil ->
         Gl.read_buffer Gl.back; Gl.stencil_index, st                          
     in
-    Gl.bind_framebuffer Gl.framebuffer fid; 
     Gl.bind_buffer Gl.pixel_pack_buffer bid; 
     Gl.read_pixels x y w h fmt st (`Offset 0);
-    Gl.bind_buffer Gl.pixel_pack_buffer 0; 
+    Gl.bind_buffer Gl.pixel_pack_buffer 0
+  
+  let read r fb rb ~pos ~size buf = 
+    if r.fbuf == fb then raw_read r fb rb ~pos ~size buf else
+    let id = setup r fb in 
+    Gl.bind_framebuffer Gl.framebuffer id; 
+    raw_read r fb rb ~pos ~size buf;
     Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf)
 end
 
@@ -1247,28 +1284,7 @@ let init_framebuffer r clear =
   let h = Float.int_of_round (Size2.h size) in 
   Gl.viewport ox oy w h; 
   Gl.scissor ox oy w h;
-  if clear then begin 
-    let clears = ref 0 in 
-    begin match r.clears.Renderer.clear_color with 
-    | None -> () 
-    | Some c -> 
-        Gl.clear_color (Color.r c) (Color.g c) (Color.b c) (Color.a c);
-        clears := Gl.(!clears + color_buffer_bit)
-    end;
-    begin match r.clears.Renderer.clear_depth with 
-    | None -> () 
-    | Some d -> 
-        Gl.clear_depth 1.; 
-        clears := Gl.(!clears + depth_buffer_bit)
-    end;
-    begin match r.clears.Renderer.clear_stencil with 
-    | None -> () 
-    | Some s -> 
-        Gl.clear_stencil s; 
-        clears := Gl.(!clears + stencil_buffer_bit)
-    end;
-    if !clears <> 0 then Gl.clear !clears
-  end;
+  if clear then BFbuf.clear r r.fbuf;
   ()
 
 let render_op r prog_binfo op = 
@@ -1320,15 +1336,15 @@ let create ?compiler_msg_parser log ~debug size =
   let r = { caps = BCap.get ();
             debug; log; compiler_msg_parser; 
             cleanups = []; 
-            clears = Renderer.clears_default;
             raster = Lit.Effect.raster_default; 
             depth = Lit.Effect.depth_default; 
             blend = Lit.Effect.blend_default;
+            fbuf = Fbuf.default;
             size; 
             view = View.create ();
             world_to_clip = lazy M4.id;
             batches = Imap.empty; 
-            fbuf = Fbuf.default; }
+             }
   in
   (init r; r)
 
@@ -1339,8 +1355,12 @@ let set_view r view =
   r.view <- view;
   r.world_to_clip <- lazy (M4.mul (View.proj view) (View.tr view))
 
-let clears r = r.clears 
-let set_clears r clears = r.clears <- clears
+let fbuf r = r.fbuf
+let set_fbuf r fbuf =
+  let id = BFbuf.setup r fbuf in 
+  Gl.bind_framebuffer Gl.framebuffer id; 
+  r.fbuf <- fbuf
+
 
 let add_op r op =  match BProg.setup r (Effect.prog op.effect) with 
 | `Error -> ()
@@ -1348,13 +1368,7 @@ let add_op r op =  match BProg.setup r (Effect.prog op.effect) with
     let batches = try Imap.find prog_id r.batches with Not_found -> [] in
     r.batches <- Imap.add prog_id (op :: batches) r.batches; 
     BPrim.setup r op.prim
-      
-let fbuf r = r.fbuf
-let set_fbuf r fbuf =
-  let id = BFbuf.setup r fbuf in 
-  Gl.bind_framebuffer Gl.framebuffer id; 
-  r.fbuf <- fbuf
-  
+        
 let render r ~clear =
   if not (r.cleanups = []) then List.iter (fun clean -> clean ()) r.cleanups;
   init_framebuffer r clear;

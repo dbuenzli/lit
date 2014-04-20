@@ -79,8 +79,8 @@ let draw r =
   Renderer.render r
 
 let resize r size =
-  let clears = { Renderer.clears_default with 
-                 Renderer.clear_color = Some Color.white }
+  let clears = { Fbuf.clears_default with 
+                 Fbuf.clear_color = Some Color.white }
   in
   let aspect = Size2.w size /. Size2.h size in
   let view = 
@@ -91,7 +91,7 @@ let resize r size =
   in
   Renderer.set_size r size;
   Renderer.set_view r view;  
-  Renderer.set_clears r clears;
+  Fbuf.set_clears Fbuf.default clears;
   ()
 
 let draw r app = draw r; App.update_surface app

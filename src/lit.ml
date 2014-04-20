@@ -341,7 +341,15 @@ module Fbuf_types = struct
     | `Stencil of image 
     | `Depth_stencil of image ]
     
-  type t = { attachements : attachement list; mutable binfo : BInfo.t }
+  type clears = 
+    { clear_color : color option; 
+      clear_depth : float option; 
+      clear_stencil : int option; }
+
+  type t = 
+    { attachements : attachement list; 
+      mutable clears : clears;
+      mutable binfo : BInfo.t }
 
   type status = 
     [ `Complete
@@ -409,12 +417,7 @@ module Cap_types = struct
 end
 
 module Renderer_types = struct
- 
-  type clears = 
-    { clear_color : color option; 
-      clear_depth : float option; 
-      clear_stencil : int option; }
-    
+     
   module type T = sig
     type t 
 
@@ -431,6 +434,7 @@ module Renderer_types = struct
     end
 
     module BFbuf : sig        
+      val clear : t -> fbuf -> unit
       val status : t -> fbuf -> Fbuf_types.status
       val read : t -> fbuf -> Fbuf_types.read -> pos:p2 -> size:size2 -> 
         buf -> unit
@@ -445,8 +449,6 @@ module Renderer_types = struct
     val set_size : t -> size2 -> unit
     val view : t -> view
     val set_view : t -> view -> unit
-    val clears : t -> clears 
-    val set_clears : t -> clears -> unit
     val fbuf : t -> fbuf 
     val set_fbuf : t -> fbuf -> unit
     val add_op : t -> op -> unit
@@ -1341,13 +1343,26 @@ module Fbuf = struct
     let binfo b = b.binfo
     let set_binfo b i = b.binfo <- i
   end
-  
-  let default = { attachements = []; binfo = BInfo.none }
-  let create attachements = { attachements; binfo = BInfo.none }
-  let attachements f = f.attachements
 
-  let status (R ((module R), r)) fb = R.BFbuf.status r fb
-        
+  let clears_default = 
+    { clear_color = Some Color.void;
+      clear_depth = Some 1.; 
+      clear_stencil = None; }
+  
+  let default = 
+    { attachements = []; 
+      clears = clears_default;
+      binfo = BInfo.none }
+
+  let create ?(clears = clears_default) attachements = 
+    { attachements; clears; binfo = BInfo.none }
+
+  let attachements fb = fb.attachements
+  let clears fb = fb.clears
+  let set_clears fb clears = fb.clears <- clears 
+
+  let clear (R ((module R), r)) fb = R.BFbuf.clear r fb
+  let status (R ((module R), r)) fb = R.BFbuf.status r fb        
   let read (R ((module R), r)) fb read ~pos ~size buf = 
     R.BFbuf.read r fb read ~pos ~size buf
         
@@ -1359,9 +1374,6 @@ end
 
 
 module Renderer = struct
-  include Renderer_types 
-
-  type t = renderer
   
   module Log = struct
 
@@ -1438,7 +1450,6 @@ module Renderer = struct
   end
 
   module Cap = struct
-
     include Cap_types 
 
     let shader_stages (R ((module R), r)) = (R.BCap.caps r).c_shader_stages
@@ -1480,7 +1491,6 @@ module Renderer = struct
       (R.BCap.caps r).c_max_render_buffer_size
   end
 
-
   module Private = struct    
     module Id = Id
     module BInfo = BInfo
@@ -1494,12 +1504,11 @@ module Renderer = struct
     module Log = Log
     module Cap = Cap
   end
-  
-  let clears_default = 
-    { clear_color = Some Color.black;
-      clear_depth = Some 1.; 
-      clear_stencil = None; }
-                           
+
+  include Renderer_types 
+
+  type t = renderer
+                             
   let op ?(count = 1) ?(uniforms = Uniform.empty) ?(tr = M4.id) effect prim = 
     { count; effect; uniforms; tr; prim }
 
@@ -1518,8 +1527,6 @@ module Renderer = struct
   let set_size (R ((module R), r)) size = R.set_size r size
   let view (R ((module R), r)) = R.view r 
   let set_view (R ((module R), r)) v = R.set_view r v
-  let clears (R ((module R), r)) = R.clears r 
-  let set_clears (R ((module R), r)) clears = R.set_clears r clears
   let add_op (R ((module R), r)) op = if op != nop then R.add_op r op
   let fbuf (R ((module R), r)) = R.fbuf r
   let set_fbuf (R ((module R), r)) fbuf = R.set_fbuf r fbuf

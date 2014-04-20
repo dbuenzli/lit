@@ -38,9 +38,6 @@ let rot = ref None
 
 (* Render *) 
 
-let clears = { Renderer.clears_default with 
-               Renderer.clear_color = Some Color.white }
-
 let draw r = 
   (* Render back faces *)
   let op = Renderer.op back ~tr:(M4.of_quat !prim_tr) !prim in
@@ -54,6 +51,9 @@ let draw r =
 
 let from = ref (P3.v 0. 0. 5.0)
 let resize r size =
+  let clears = { Fbuf.clears_default with 
+                 Fbuf.clear_color = Some Color.white }
+  in
   let aspect = Size2.w size /. Size2.h size in
   let view = 
     let tr = View.look ~at:P3.o ~from:!from () in 
@@ -61,9 +61,9 @@ let resize r size =
     let proj = View.persp ~fov ~aspect ~near:0.1 ~far:10. in
     View.create ~tr ~proj ()
   in
-  Renderer.set_clears r clears;
   Renderer.set_size r size;
-  Renderer.set_view r view;  
+  Renderer.set_view r view;
+  Fbuf.set_clears Fbuf.default clears;  
   ()
 
 let draw r app = draw r; App.update_surface app
