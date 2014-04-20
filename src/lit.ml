@@ -353,7 +353,8 @@ module Fbuf_types = struct
     | `Incomplete_multisample
     | `Incomplete_read_buffer
     | `Undefined
-    | `Unsupported ]      
+    | `Unsupported 
+    | `Unknown of int ]
 
   type read = 
     [ `Color_r of int 
@@ -1352,6 +1353,20 @@ module Fbuf = struct
   let set_clears fb clears = fb.clears <- clears 
 
   let clear (R ((module R), r)) fb = R.BFbuf.clear r fb
+
+  let pp_status ppf s = pp ppf "%s" begin match s with 
+    | `Complete -> "complete"
+    | `Incomplete_attachement -> "incomplete attachement" 
+    | `Incomplete_draw_buffer -> "incomplete draw buffer" 
+    | `Incomplete_layer_targets -> "incomplete layer targets" 
+    | `Incomplete_missing_attachement -> "incomplete missing attachement"
+    | `Incomplete_multisample -> "incomplete multisample"
+    | `Incomplete_read_buffer -> "incomplete read buffer"
+    | `Undefined -> "undefined"
+    | `Unsupported -> "unsupported"
+    | `Unknown c -> (str "unknown (%X)" c)
+    end
+
   let status (R ((module R), r)) fb = R.BFbuf.status r fb        
   let read ?(first = 0) ?w_stride (R ((module R), r)) fb read box buf = 
     R.BFbuf.read r fb read box ~first ~w_stride buf

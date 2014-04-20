@@ -1217,9 +1217,13 @@ module Fbuf : sig
     | `Incomplete_multisample
     | `Incomplete_read_buffer
     | `Undefined
-    | `Unsupported ]      
+    | `Unsupported 
+    | `Unknown of int ]      
   (** The type for frame buffer statuses. *) 
-    
+
+  val pp_status : Format.formatter -> status -> unit 
+  (** [pp_status ppf s] prints a textual representation of [s] on [ppf]. *)
+  
   val status : renderer -> fbuf -> status
   (** [status r fb] is [fb]'s status. *) 
 

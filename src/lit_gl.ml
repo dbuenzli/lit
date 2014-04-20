@@ -1203,7 +1203,7 @@ module BFbuf = struct
         id
 
   let status_enum_to_variant = 
-    Gl_hi.enum_map ~not_found:(fun e -> failwith "TODO") 
+    Gl_hi.enum_map ~not_found:(fun e -> `Unknown e) 
       [ Gl.framebuffer_complete, `Complete;
         Gl.framebuffer_undefined, `Undefined; 
         Gl.framebuffer_incomplete_attachment, `Incomplete_attachement; 
