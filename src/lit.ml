@@ -242,12 +242,12 @@ module Prog_types = struct
   type insert = loc * string 
   type lang = [ `GLSL of int | `GLSL_ES of int ] 
               
-  type shader_kind = 
+  type shader_stage = 
     [ `Vertex | `Tess_control | `Tess_evaluation | `Geometry
     | `Fragment | `Compute ]
     
   type shader = 
-    { kind : shader_kind; 
+    { stage : shader_stage; 
       lang : lang option;
       srcs : (loc * string) list (* list is reversed *); }
     
@@ -372,6 +372,20 @@ type op =
     tr : m4;
     prim : prim; }
 
+module Cap_types = struct
+  type gl_version =
+    [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
+
+  type t = 
+    { c_shader_stages : Prog_types.shader_stage list; 
+      c_max_samples : int;
+      c_max_tex_size : int; 
+      c_max_render_buffer_size : int; 
+      c_gl_version : gl_version; 
+      c_glsl_version : gl_version; 
+      c_gl_renderer : string;
+      c_gl_vendor : string; }
+end
 
 module Renderer_types = struct
  
@@ -379,7 +393,7 @@ module Renderer_types = struct
     { clear_color : color option; 
       clear_depth : float option; 
       clear_stencil : int option; }
-
+    
   module type T = sig
     type t 
       
@@ -389,6 +403,10 @@ module Renderer_types = struct
       val gpu_map : t -> [ `R | `W | `RW ]  -> buf -> 
         ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
       val gpu_unmap : t -> buf -> unit
+    end
+
+    module BCap : sig
+      val caps : t -> Cap_types.t 
     end
 
     val name : string
@@ -407,23 +425,6 @@ module Renderer_types = struct
     val add_op : t -> op -> unit
     val render : t -> clear:bool -> unit
     val release : t -> unit
-
-
-    module Cap : sig
-      val shader_kinds : t -> Prog_types.shader_kind list
-      val gl_version : t ->
-        [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
-      val glsl_version : t ->
-        [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
-      val gl_renderer : t -> string 
-      val gl_vendor : t -> string 
-
-      type caps =
-        { c_max_samples : int;
-          c_max_tex_size : int;
-          c_max_render_buffer_size : int; }        
-      val caps : t -> caps 
-    end
 
     module Fbuf : sig 
       type read_buf = 
@@ -1145,7 +1146,7 @@ module Prog = struct
 
   (* Shaders *) 
 
-  let pp_shader_kind ppf sk = pp ppf begin match sk with 
+  let pp_shader_stage ppf sk = pp ppf begin match sk with 
     | `Vertex -> "vertex"
     | `Tess_control -> "tess_control"
     | `Tess_evaluation -> "tess_evaluation"
@@ -1154,15 +1155,15 @@ module Prog = struct
     | `Compute -> "compute"
     end
 
-  let shader ?lang ?loc ?(inserts = []) kind src =
+  let shader ?lang ?loc ?(inserts = []) stage src =
     let stack = Printexc.get_callstack 2 in
     let loc = match loc with
     | None -> parse_loc (Printexc.raw_backtrace_to_string stack)
     | Some loc -> loc 
     in
-    { kind; lang; srcs = (loc, src) :: (List.rev inserts) }
+    { stage; lang; srcs = (loc, src) :: (List.rev inserts) }
 
-  let kind s = s.kind
+  let stage s = s.stage
   let loc s = fst (List.hd s.srcs) 
   let lang s = s.lang
   
@@ -1417,7 +1418,7 @@ module Renderer = struct
     | `Unsupported_shaders (p, sl) -> 
         let pp_unsup ppf s =
           pp ppf "%a: %a shader unsupported (program %s)" 
-            Prog.pp_loc (Prog.loc s) Prog.pp_shader_kind (Prog.kind s) 
+            Prog.pp_loc (Prog.loc s) Prog.pp_shader_stage (Prog.stage s) 
             (Prog.name p)
         in
         pp ppf "@[<v>%a@]" (pp_list pp_unsup) sl
@@ -1425,6 +1426,64 @@ module Renderer = struct
     (* Logs *) 
 
     let of_formatter ppf level msg = pp ppf "%a@." pp_msg msg 
+  end
+
+  module Cap = struct
+
+    include Cap_types 
+
+    let shader_stages (R ((module R), r)) = (R.BCap.caps r).c_shader_stages
+
+    (* OpenGL implementation information *) 
+
+    let pp_gl_version ppf v = 
+      let pp_version ppf (x, y, z) = 
+        if z = 0 then pp ppf "%d.%d" x y else pp ppf "%d.%d.%d" x y z 
+      in
+      match v with 
+      | `GL (x, y, z) -> pp_version ppf (x, y, z) 
+      | `GLES (x, y, z) -> pp ppf "@[ES %a@]" pp_version (x, y, z) 
+      | `Unknown -> pp ppf "unknown" 
+
+    let parse_version s = 
+      let s = String.trim s in
+      let v = try String.sub s 0 (String.index s ' ') with Not_found -> s in 
+      let int s = int_of_string (String.trim s) in
+      try match List.map int (Log.split_string '.' v) with
+      | [x; y; z] -> Some (x, y, z) 
+      | [x; y] -> Some (x, y, 0)
+      | _ -> None
+      with Failure _ -> None
+                      
+    let gl_version (R ((module R), r)) = (R.BCap.caps r).c_gl_version
+    let glsl_version (R ((module R), r)) = (R.BCap.caps r).c_glsl_version
+    let gl_renderer (R ((module R), r)) = (R.BCap.caps r).c_gl_renderer
+    let gl_vendor (R ((module R), r)) = (R.BCap.caps r).c_gl_vendor
+    let pp_gl_synopsis ppf r = 
+      pp ppf "@[Renderer %s@ -- OpenGL %a / GLSL %a@]" 
+        (gl_renderer r) 
+        pp_gl_version (gl_version r) 
+        pp_gl_version (glsl_version r)
+
+    let max_samples (R ((module R), r)) = (R.BCap.caps r).c_max_samples
+    let max_tex_size (R ((module R), r)) = (R.BCap.caps r).c_max_tex_size
+    let max_render_buffer_size (R ((module R), r)) = 
+      (R.BCap.caps r).c_max_render_buffer_size
+  end
+
+
+  module Private = struct    
+    module Id = Id
+    module BInfo = BInfo
+    module Buf = Buf
+    module Attr = Attr
+    module Prim = Prim
+    module Tex = Tex
+    module Prog = Prog
+    module Effect = Effect
+    module Fbuf = Fbuf
+    module Log = Log
+    module Cap = Cap
   end
   
   let clears_default = 
@@ -1458,63 +1517,7 @@ module Renderer = struct
   let render ?(clear = true) (R ((module R), r)) = R.render r ~clear
   let release (R ((module R), r)) = R.release r
 
-  module Cap = struct
 
-    let shader_kinds (R ((module R), r)) = R.Cap.shader_kinds r
-
-    (* OpenGL implementation information *) 
-
-    type gl_version =
-      [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
-
-    let pp_gl_version ppf v = 
-      let pp_version ppf (x, y, z) = 
-        if z = 0 then pp ppf "%d.%d" x y else pp ppf "%d.%d.%d" x y z 
-      in
-      match v with 
-      | `GL (x, y, z) -> pp_version ppf (x, y, z) 
-      | `GLES (x, y, z) -> pp ppf "@[ES %a@]" pp_version (x, y, z) 
-      | `Unknown -> pp ppf "unknown" 
-
-    let parse_version s = 
-      let s = String.trim s in
-      let v = try String.sub s 0 (String.index s ' ') with Not_found -> s in 
-      let int s = int_of_string (String.trim s) in
-      try match List.map int (Log.split_string '.' v) with
-      | [x; y; z] -> Some (x, y, z) 
-      | [x; y] -> Some (x, y, 0)
-      | _ -> None
-      with Failure _ -> None
-                      
-    let gl_version (R ((module R), r)) = R.Cap.gl_version r
-    let glsl_version (R ((module R), r)) = R.Cap.glsl_version r
-    let gl_renderer (R ((module R), r)) = R.Cap.gl_renderer r
-    let gl_vendor (R ((module R), r)) = R.Cap.gl_vendor r
-    let pp_gl_synopsis ppf r = 
-      pp ppf "@[Renderer %s@ -- OpenGL %a / GLSL %a@]" 
-        (gl_renderer r) 
-        pp_gl_version (gl_version r) 
-        pp_gl_version (glsl_version r)
-
-    let max_samples (R ((module R), r)) = (R.Cap.caps r).R.Cap.c_max_samples
-    let max_tex_size (R ((module R), r)) = (R.Cap.caps r).R.Cap.c_max_tex_size
-    let max_render_buffer_size (R ((module R), r)) = 
-      (R.Cap.caps r).R.Cap.c_max_render_buffer_size
-  end
-
-  module Private = struct    
-    module Id = Id
-    module BInfo = BInfo
-    module Cap = Cap 
-    module Buf = Buf
-    module Attr = Attr
-    module Prim = Prim
-    module Tex = Tex
-    module Prog = Prog
-    module Effect = Effect
-    module Fbuf = Fbuf
-    module Log = Log
-  end
 
   module Fbuf = struct
       type read_buf = 

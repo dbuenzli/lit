@@ -63,8 +63,7 @@ type config =
     tick_hz : int; 
     pos : v2; 
     size : size2; 
-    name : string; 
-    ev : t -> ev -> [ `Ok | `Error of string | `Yield | `Quit ] } 
+    name : string; } 
 
 and t = { 
   log : 'a. ('a, Format.formatter, unit) format -> 'a;
@@ -104,8 +103,7 @@ let default =
     tick_hz = 0;
     pos = V2.neg_infinity;
     size = V2.v 600. 400.;
-    name = String.capitalize exec;
-    ev = fun _ _ -> `Ok }
+    name = String.capitalize exec; }
 
 
 (* Timing *) 
@@ -181,17 +179,17 @@ let toggle_fullscreen app = match app.init with
                   
 (* Keyboard *)
 
-let callback_ev app e = app.state <- app.config.ev app e
+let callback_ev app ev e = app.state <- ev app e
 
-let text_editing_ev app e = 
+let text_editing_ev app ev e = 
   let text = Sdl.Event.(get e text_editing_text) in 
   let start = Sdl.Event.(get e text_editing_start) in 
   let len = Sdl.Event.(get e text_editing_length) in 
   Printf.printf "TODO Text editing ! t:%s start:%d len:%d" text start len
     
-let text_input_ev app e = 
+let text_input_ev app ev e = 
   let text = Sdl.Event.(get e text_input_text) in
-  callback_ev app (`Text text)
+  callback_ev app ev (`Text text)
 
 
 let keysym_to_string (ksym : keysym) = 
@@ -266,16 +264,17 @@ let keysym_of_keycode =
   | Not_found -> 
       if kc land Sdl.K.scancode_mask > 0 then `Unknown kc else `Uchar kc
       
-let keyboard_ev app e state =
+let keyboard_ev app ev e state =
   let keysym = keysym_of_keycode (Sdl.Event.(get e keyboard_keycode)) in
-  callback_ev app (`Key (state, keysym))
+  callback_ev app ev (`Key (state, keysym))
 
-let window_ev app e = 
+let window_ev app ev e = 
   match Sdl.Event.(window_event_enum (get e window_event_id)) with
-  | `Exposed | `Resized -> callback_ev app (`Env (`Resize (surface_size app)))
+  | `Exposed | `Resized -> 
+      callback_ev app ev (`Env (`Resize (surface_size app)))
   | _ -> ()
 
-let mouse_button_ev app e state =   
+let mouse_button_ev app ev e state =   
   let pos =
     let x = Sdl.Event.(get e mouse_button_x) in 
     let y = Sdl.Event.(get e mouse_button_y) in
@@ -290,9 +289,9 @@ let mouse_button_ev app e state =
   | b when b = Sdl.Button.x2 -> `X2
   | b -> `Left (* avoid assert false, SDL may come up with new things *) 
   in
-  callback_ev app (`Mouse (`Button (state, but, pos)))
+  callback_ev app ev (`Mouse (`Button (state, but, pos)))
 
-let mouse_motion_ev app e = 
+let mouse_motion_ev app ev e = 
   let size = size app in
   let pos = 
     let x = Sdl.Event.(get e mouse_motion_x) in 
@@ -304,23 +303,23 @@ let mouse_motion_ev app e =
     let yrel = Sdl.Event.(get e mouse_motion_yrel) in
     P2.v (float xrel /. Size2.w size) (1. -. (float yrel /. Size2.h size))
   in
-  callback_ev app (`Mouse (`Motion (pos, rel)))
+  callback_ev app ev (`Mouse (`Motion (pos, rel)))
 
-let do_event app e = 
+let do_event app ev e = 
   let event e = Sdl.Event.(enum (get e typ)) in
   match event e with 
   | `Quit -> app.state <- `Quit
-  | `Key_down -> keyboard_ev app e `Down 
-  | `Key_up -> keyboard_ev app e `Up
-  | `Window_event -> window_ev app e 
-  | `Mouse_button_down -> mouse_button_ev app e `Down
-  | `Mouse_button_up -> mouse_button_ev app e `Up
-  | `Mouse_motion -> mouse_motion_ev app e
-  | `Text_editing -> text_editing_ev app e
-  | `Text_input -> ignore (text_input_ev app e)
+  | `Key_down -> keyboard_ev app ev e `Down 
+  | `Key_up -> keyboard_ev app ev e `Up
+  | `Window_event -> window_ev app ev e 
+  | `Mouse_button_down -> mouse_button_ev app ev e `Down
+  | `Mouse_button_up -> mouse_button_ev app ev e `Up
+  | `Mouse_motion -> mouse_motion_ev app ev e
+  | `Text_editing -> text_editing_ev app ev e
+  | `Text_input -> ignore (text_input_ev app ev e)
   | _ -> ()
            
-let event_loop app _ =
+let event_loop app _ ev =
   let e = Sdl.Event.create () in 
   let e_some = Some e in
   let tick_period = tick_period app.config.tick_hz in
@@ -328,11 +327,11 @@ let event_loop app _ =
     let now = tick_now () in 
     let next = 
       if now < next then next else begin 
-        callback_ev app (`Tick (elapsed_of_ticks now));
+        callback_ev app ev (`Tick (elapsed_of_ticks now));
         tick_next now tick_period
       end
     in
-    if Sdl.poll_event e_some then do_event app e else
+    if Sdl.poll_event e_some then do_event app ev e else
     begin
       let dur = min (dur_to_next_ms now next) 10L in
       Sdl.delay (Int64.to_int32 dur);      
@@ -353,28 +352,27 @@ let create config =
       state = `Ok
     }
   in
-  match app.init with 
-  | `Ok _ -> 
-      callback_ev app (`Env `Init);
-      callback_ev app (`Env (`Resize (surface_size app)));
-      app
-  | _ -> app
+  app
 
 let update_surface app = match app.init with 
 | `Ok (win, _) -> Sdl.gl_swap_window win
 | _ -> ()
 
-let run app = match app.init with 
+let run app ~ev = match app.init with 
 | `Error m -> `Error m 
 | `Ok (win, ctx) -> 
+    begin 
+      callback_ev app ev (`Env `Init);
+      callback_ev app ev (`Env (`Resize (surface_size app)));
+    end;
     match app.state with
     | `Yield | `Ok -> 
-        begin match event_loop app win with 
+        begin match event_loop app win ev with 
         | `Error m -> `Error m
         | `Yield -> `Ok
         | `Ok -> assert false 
         | `Quit -> 
-            ignore (app.config.ev app (`Env `Exit)); 
+            ignore (ev app (`Env `Exit)); 
             match begin destroy_window win ctx >>= fun () -> 
             Sdl.quit ();
             `Quit end with 
@@ -385,7 +383,7 @@ let run app = match app.init with
     | `Quit -> `Quit
     | `Error _ as e -> e
 
-let handle_run app = match run app with
+let handle_run app ~ev = match run app ev with
 | `Ok -> Pervasives.exit 0
 | `Error msg -> app.log "%s@." msg; Pervasives.exit 1
 | `Quit -> Pervasives.exit 0

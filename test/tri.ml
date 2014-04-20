@@ -48,28 +48,30 @@ let op = Renderer.op effect (triangle ())
 (* Render *) 
 
 let size = V2.v 600. 400.
-let r = Renderer.create ~size (App.select_backend ()) 
+
 
 let view = View.create () 
-let draw () = 
+let draw r = 
   Renderer.set_view r view;
   Renderer.add_op r op;
   Renderer.render r
 
-let ev app ev = match (ev : App.ev) with 
+let ev r app ev = match (ev : App.ev) with 
 | `Env `Exit -> Renderer.release r; `Ok
 | `Env `Init -> 
     Format.printf "@[%a@]@." Renderer.Cap.pp_gl_synopsis r; `Ok
 | `Env (`Resize size) ->
     Renderer.set_size r size; 
-    draw ();
+    draw r;
     App.update_surface app;
     `Ok
 | `Tick _ -> assert false
 | _ -> `Ok 
 
-let app = App.create { App.default with App.size = size; ev }
-let () = App.handle_run app
+let () = 
+  let app = App.create { App.default with App.size = size; } in
+  let r = Renderer.create ~size (App.select_backend ()) in
+  App.handle_run app ~ev:(ev r)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2014 Daniel C. Bünzli.

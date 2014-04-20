@@ -114,8 +114,7 @@ type config =
     tick_hz : int; 
     pos : v2; 
     size : size2; 
-    name : string; 
-    ev : t -> ev -> ev_ret }
+    name : string; }
 
 val default : config 
 (** [default] is the default configuration. TODO *)
@@ -128,10 +127,10 @@ val size : t -> size2
 
 (** {1 Run} *) 
 
-val run : t -> [ `Ok | `Error of string | `Quit ]
+val run : t -> ev:(t -> ev -> ev_ret) -> [ `Ok | `Error of string | `Quit ]
 (** [run app] runs the app [name] using [ev] and [config]. *)
 
-val handle_run : t -> unit
+val handle_run : t -> ev:(t -> ev -> ev_ret) -> unit
 
 
 (*---------------------------------------------------------------------------

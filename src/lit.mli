@@ -809,30 +809,30 @@ v}
   (** The type for shading language version and dialects. Use [150] for 
       1.50. *) 
 
-  type shader_kind = 
+  type shader_stage = 
     [ `Vertex | `Tess_control | `Tess_evaluation | `Geometry
     | `Fragment | `Compute ]
-  (** Kinds of shaders. 
-      Note that not all renderers support all shaders, see 
-      {!Renderer.Cap.shader_kinds}. *) 
+  (** Shader stages.
+      Note that not all renderers support all shaders stages, see 
+      {!Renderer.Cap.shader_stages}. *) 
 
-  val pp_shader_kind : Format.formatter -> shader_kind -> unit 
-  (** [pp_shader_kind ppf k] prints an unspecified representatino of [k]
-      on [ppf]. *) 
+  val pp_shader_stage : Format.formatter -> shader_stage -> unit 
+  (** [pp_shader_stage ppf stage] prints an unspecified representatino of 
+      [stage] on [ppf]. *) 
   
   type shader
   (** The type for shaders. *) 
 
-  val shader : ?lang:lang -> ?loc:loc -> ?inserts:insert list -> shader_kind -> 
-    string -> shader
-  (** [shader ~loc:(`Loc (f, l)) ~inserts k src] is the shader of kind [k]
-      made by pre-concatening the inserts [inserts] to [src] located 
-      in file [f] at line [l]. If [loc] is unspecified the location 
-      of the function call is used provided the program is compiled 
-      with [-g]. *)
+  val shader : ?lang:lang -> ?loc:loc -> ?inserts:insert list -> 
+    shader_stage -> string -> shader
+  (** [shader ~loc:(`Loc (f, l)) ~inserts stage src] is the shader for
+      stage [stage] made by pre-concatening the inserts [inserts] to
+      [src] located in file [f] at line [l]. If [loc] is unspecified
+      the location of the function call is used provided the program
+      is compiled with [-g]. *)
 
-  val kind : shader -> shader_kind 
-  (** [kind s] is the shader kind of [s]. *) 
+  val stage : shader -> shader_stage
+  (** [stage s] is the shader stage of [s]. *) 
 
   val loc : shader -> loc
   (** [loc s] is the location of shader [s]. *) 
@@ -1260,11 +1260,102 @@ module Renderer : sig
     (** [of_formatter ppf] is a log that outputs on [ppf]. *) 
   end
 
-  (** Private functions for implementing renderers. 
+  (** Private functions and types for implementing renderers. 
   
       {b Warning.}  [Lit] users should not use these definitions. They 
       expose [Lit]'s internals and are subject to change even between 
       minor versions of the library. *)
+
+  (** {1:ops Render operations} *) 
+
+  val op : ?count:int -> ?uniforms:Uniform.set -> ?tr:m4 -> effect -> prim -> op
+  (** [op count uniforms tr e p] is a render op. [count] defaults to 1. 
+      [uniforms] defaults to {!Uniform.empty}, [tr] to {!M4.id}. *)
+    
+  val nop : op 
+  (** [nop] is a render no-op, it has no effect on the renderer. *) 
+
+  val add_op : renderer -> op -> unit
+  (** [add_op r o] adds render operation [o] on [r]. *) 
+
+  (** {1 Window geometry and projection} *)
+
+  val size : renderer -> size2
+  val set_size : renderer -> size2 -> unit
+  val view : renderer -> View.t
+  val set_view : renderer -> View.t -> unit
+
+  (** {1 Framebuffers} *) 
+    
+  val fbuf : renderer -> fbuf
+  (** [fbuf r] is the framebuffer on which render ops are performed. *)
+    
+  val set_fbuf : renderer -> fbuf -> unit
+  (** [set_fbuf r fbuf] sets the framebuffer to [fbuf]. *) 
+    
+  (** Renderer capabilities. *)
+  module Cap : sig
+
+    (** {1 Renderer capabilities and limits} *) 
+
+    val shader_stages : renderer -> Prog.shader_stage list
+    (** [shader_stages r] is the list of {{!Prog.shader_stages}shader stages} 
+        supported by the renderer. *)
+
+    val max_samples : renderer -> int
+    val max_tex_size : renderer -> int
+    val max_render_buffer_size : renderer -> int
+
+    (** {1 OpenGL implementation information} *) 
+    
+    type gl_version = 
+      [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
+    (** The type for GL versions. *) 
+
+    val pp_gl_version : Format.formatter -> gl_version -> unit 
+    (** [pp_gl_version ppf v] prints an unspecified representation of [v]
+        on [ppf]. *) 
+
+    val gl_version : renderer -> gl_version
+    (** [gl_version r] is the OpenGL version number of [r]. *) 
+
+    val glsl_version : renderer -> gl_version 
+    (** [gl_version r] is the shading language version number of [r]. *) 
+
+    val gl_renderer : renderer -> string 
+    (** [gl_renderer r] is the OpenGL renderer of [r]. *) 
+
+    val gl_vendor : renderer -> string 
+    (** [gl_vendor r] is the OpenGL renderer vendor of [r]. *) 
+
+    val pp_gl_synopsis : Format.formatter -> renderer -> unit
+    (** [pp_gl_synopsis ppf r] prints a short two lines summary 
+        of the OpenGL implementation [r] is dealing with. *)
+  end
+
+ 
+  (** {1 Framebuffer clearing.} 
+      
+      {b TODO} shouldn't we move that to Fbuf and Renderer.Fbuf. *) 
+
+  type clears = 
+    { clear_color : color option; 
+      clear_depth : float option; 
+      clear_stencil : int option; }
+
+  val clears_default : clears  
+  val clears : renderer -> clears
+  val set_clears : renderer -> clears -> unit
+(*  val clear : renderer -> unit  *)
+
+  (** {1 Rendering} *) 
+
+  val render : ?clear:bool -> renderer -> unit
+  (** [render clear r] renders the added operations. If [clear] is 
+      [true] (default) the buffers are cleared before rendering. *) 
+
+  (** {1 Renderers} *) 
+
   module Private : sig
 
     module Id : sig
@@ -1276,10 +1367,6 @@ module Renderer : sig
       type t 
       val create : unit -> ('a -> t) * (t -> 'a option)
       val none : t
-    end
-
-    module Cap : sig
-      val parse_version : string -> (int * int * int) option 
     end
 
     module Buf : sig
@@ -1314,7 +1401,7 @@ module Renderer : sig
     end
 
     module Prog : sig 
-      include module type of Prog
+      include module type of Prog with type shader = Prog.shader
       val binfo : prog -> BInfo.t
       val set_binfo : prog -> BInfo.t -> unit
     end
@@ -1346,35 +1433,21 @@ module Renderer : sig
       val compiler_msg : string -> compiler_msg_parser ->
         (int * string) list -> [> `Compiler of compiler_msg list ]
     end
+
+    module Cap : sig
+      val parse_version : string -> (int * int * int) option 
+      type t = 
+        { c_shader_stages : Prog.shader_stage list; 
+          c_max_samples : int;
+          c_max_tex_size : int; 
+          c_max_render_buffer_size : int;
+          c_gl_version : Cap.gl_version; 
+          c_glsl_version : Cap.gl_version; 
+          c_gl_renderer : string;
+          c_gl_vendor : string; }
+    end
   end
 
-  (** {1:ops Render operations} *) 
-
-  val op : ?count:int -> ?uniforms:Uniform.set -> ?tr:m4 -> effect -> prim -> op
-  (** [op count uniforms tr e p] is a render op. [count] defaults to 1. 
-      [uniforms] defaults to {!Uniform.empty}, [tr] to {!M4.id}. *)
-    
-  val nop : op 
-  (** [nop] is a render no-op, it has no effect on the renderer. *) 
-
-  val add_op : renderer -> op -> unit
-  (** [add_op r o] adds render operation [o] on [r]. *) 
-
-  (** {1 Window geometry and projection} *)
-
-  val size : renderer -> size2
-  val set_size : renderer -> size2 -> unit
-  val view : renderer -> View.t
-  val set_view : renderer -> View.t -> unit
-
-  (** {1 Framebuffers} *) 
-    
-  val fbuf : renderer -> fbuf
-  (** [fbuf r] is the framebuffer on which render ops are performed. *)
-    
-  val set_fbuf : renderer -> fbuf -> unit
-  (** [set_fbuf r fbuf] sets the framebuffer to [fbuf]. *) 
-    
   (** Renderer specific framebuffer functions. *) 
   module Fbuf : sig 
     
@@ -1412,74 +1485,10 @@ module Renderer : sig
       | `Unsupported ]      
   end
 
-  (** Renderer capabilities. *)
-  module Cap : sig
-
-    (** {1 Shader capabilities} *)
-
-    val shader_kinds : renderer -> Prog.shader_kind list
-    (** [shader_kinds r] is the list of {{!Prog.shader_kind}shader kinds} 
-        supported by the renderer. *)
-
-    (** {1 OpenGL implementation information} *) 
-    
-    type gl_version = 
-      [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
-    (** The type for GL versions. *) 
-
-    val pp_gl_version : Format.formatter -> gl_version -> unit 
-    (** [pp_gl_version ppf v] prints an unspecified representation of [v]
-        on [ppf]. *) 
-
-    val gl_version : renderer -> gl_version
-    (** [gl_version r] is the OpenGL version number of [r]. *) 
-
-    val glsl_version : renderer -> gl_version 
-    (** [gl_version r] is the shading language version number of [r]. *) 
-
-    val gl_renderer : renderer -> string 
-    (** [gl_renderer r] is the OpenGL renderer of [r]. *) 
-
-    val gl_vendor : renderer -> string 
-    (** [gl_vendor r] is the OpenGL renderer vendor of [r]. *) 
-
-    val pp_gl_synopsis : Format.formatter -> renderer -> unit
-    (** [pp_gl_synopsis ppf r] prints a short two lines summary 
-        of the OpenGL implementation [r] is dealing with. *)
-
-    (** {1 Renderer limits.} *) 
-
-    val max_samples : renderer -> int
-    val max_tex_size : renderer -> int
-    val max_render_buffer_size : renderer -> int
-  end
-
- 
-  (** {1 Framebuffer clearing.} 
-      
-      {b TODO} shouldn't we move that to Fbuf and Renderer.Fbuf.
-  *) 
-
-  type clears = 
-    { clear_color : color option; 
-      clear_depth : float option; 
-      clear_stencil : int option; }
-
-  val clears_default : clears  
-  val clears : renderer -> clears
-  val set_clears : renderer -> clears -> unit
-(*  val clear : renderer -> unit  *)
-
-  (** {1 Rendering} *) 
-
-  val render : ?clear:bool -> renderer -> unit
-  (** [render clear r] renders the added operations. If [clear] is 
-      [true] (default) the buffers are cleared before rendering. *) 
-
-  (** {1 Creating} *) 
 
   (** The type for a renderer backend. *) 
   module type T = sig
+    
     type t 
 
     module BBuf : sig 
@@ -1488,6 +1497,10 @@ module Renderer : sig
       val gpu_map : t -> [ `R | `W | `RW ]  -> buf -> 
         ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
       val gpu_unmap : t -> buf -> unit
+    end
+
+    module BCap : sig
+      val caps : t -> Private.Cap.t 
     end
 
     val name : string
@@ -1506,22 +1519,6 @@ module Renderer : sig
     val render : t -> clear:bool -> unit
     val release : t -> unit
 
-    module Cap : sig
-      val shader_kinds : t -> Prog.shader_kind list
-      val gl_version : t ->
-        [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
-      val glsl_version : t ->
-        [ `GL of (int * int * int) | `GLES of (int * int * int) | `Unknown ] 
-      val gl_renderer : t -> string 
-      val gl_vendor : t -> string 
-
-      type caps = 
-        { c_max_samples : int;
-          c_max_tex_size : int; 
-          c_max_render_buffer_size : int; }
-
-      val caps : t -> caps 
-    end
 
     module Fbuf : sig 
       type read_buf = 
@@ -1549,8 +1546,6 @@ module Renderer : sig
         | `Unsupported ]      
     end 
   end
-
-  (** {1:renderers Renderers} *)
   
   type t = renderer
   (** The type for renderers. *)
@@ -1562,9 +1557,12 @@ module Renderer : sig
     size:size2 -> 
     (module T) -> 
     renderer
+  (** [creates size b] creates a renderer with backend [b]. 
+      A valid OpenGL context is needed before calling this function. *)
 
   val release : renderer -> unit
   (** [release r] releases GPU resources associated to the renderer. *) 
+
 end
   
 

@@ -5,22 +5,13 @@
   ---------------------------------------------------------------------------*)
 
 open Gg
-open Lit
 open Tgl3
+open Lit
+open Renderer.Private 
 
 let str = Printf.sprintf 
 
-(*
-open Renderer.Private 
-
-*)
-module Id = Renderer.Private.Id
 module Imap = Map.Make (Id) 
-module BInfo = Renderer.Private.BInfo
-module Attr = Renderer.Private.Attr
-module Log = Renderer.Private.Log 
-module Buf = Renderer.Private.Buf
-
 module Smap = Map.Make (String)
 
 module Gl_hi = struct                         (* Wraps a few Gl functions. *) 
@@ -122,7 +113,7 @@ end
 (* Renderer *) 
 
 type t = 
-  { mutable init : bool;
+  { mutable caps : Cap.t;
     mutable debug : bool;
     mutable log : Log.t; 
     mutable compiler_msg_parser : Log.compiler_msg_parser;
@@ -141,43 +132,51 @@ type t =
 let log_error r msg = r.log `Error msg 
 let log_debug r msg = r.log `Debug msg
 
-(* Caps *) 
+(* Backend caps *) 
 
-module Cap = struct
-  include Renderer.Private.Cap
-            
-  (* Shader capabilities *) 
-
-  let shader_kinds = [ `Vertex; `Fragment; `Geometry ]
-  let shader_kinds r = shader_kinds
-
-  (* OpenGL information *) 
-
-  let get_version r enum = match Gl.get_string enum with 
+module BCap = struct
+             
+  let get_version enum = match Gl.get_string enum with 
   | None -> `Unknown 
   | Some v -> 
-      match parse_version v with 
-      | Some (x,y,z) -> `GL (x, y, z)
+      match Cap.parse_version v with 
+      | Some (x, y, z) -> `GL (x, y, z)
       | None -> `Unknown 
-    
-  let gl_version r = get_version r Gl.version 
-  let glsl_version r = get_version r Gl.shading_language_version 
-  let gl_renderer r = match Gl.get_string Gl.renderer with 
-  | None -> "unknown" | Some r -> r
+        
+  let gl_version () = get_version Gl.version 
+  let glsl_version () = get_version Gl.shading_language_version 
+  let gl_renderer () = match Gl.get_string Gl.renderer with 
+  | None -> "unknown" 
+  | Some r -> r
 
-  let gl_vendor r = match Gl.get_string Gl.vendor with 
-  | None -> "unknown" | Some r -> r    
+  let gl_vendor () = match Gl.get_string Gl.vendor with 
+  | None -> "unknown" 
+  | Some v -> v    
 
-  type caps = 
-    { c_max_samples : int;
-      c_max_tex_size : int; 
-      c_max_render_buffer_size : int; }
-
-  let caps r = 
-    { c_max_samples = Gl_hi.get_int (Gl.get_integerv Gl.max_samples); 
+  let shader_stages v = 
+    let base = [ `Vertex; `Fragment; `Geometry ] in 
+    match v with
+    | `GL (maj, min, _) when maj >= 4 ->
+        let base = `Tess_control :: `Tess_evaluation :: base in 
+        if min >= 3 then `Compute :: base else base 
+    | `GL _ -> base 
+    | `Unknown -> base
+    | _ -> assert false 
+      
+  let get () = 
+    let gl_version = gl_version () in
+    let open Cap in
+    { c_shader_stages = shader_stages gl_version; 
+      c_max_samples = Gl_hi.get_int (Gl.get_integerv Gl.max_samples); 
       c_max_tex_size = Gl_hi.get_int (Gl.get_integerv Gl.max_texture_size); 
       c_max_render_buffer_size = 
-        Gl_hi.get_int (Gl.get_integerv Gl.max_renderbuffer_size); }
+        Gl_hi.get_int (Gl.get_integerv Gl.max_renderbuffer_size);
+      c_gl_version = gl_version; 
+      c_glsl_version = glsl_version (); 
+      c_gl_renderer = gl_renderer (); 
+      c_gl_vendor = gl_vendor (); }
+
+  let caps r = r.caps
 end
 
 (* Backend buffers  *) 
@@ -301,10 +300,9 @@ module BBuf = struct
     Gl.bind_buffer Gl.array_buffer 0
 end
 
-(* Prims *) 
+(* Backend prims *) 
 
-module Prim = struct
-  include Renderer.Private.Prim
+module BPrim = struct
             
   let enum_of_kind = function
   | `Points -> Gl.points
@@ -326,15 +324,15 @@ module Prim = struct
       mutable last_prog : Id.t; }  (* last program id it was bound to. *) 
           
   let inject, project = BInfo.create ()
-  let binfo p = project (binfo p)
+  let binfo p = project (Prim.binfo p)
   let get_binfo p = match binfo p with None -> assert false | Some i -> i
-  let set_binfo p (i : binfo) = set_binfo p (inject i)
+  let set_binfo p (i : binfo) = Prim.set_binfo p (inject i)
 
   let finalise_binfo i =
     Gl_hi.delete_vertex_array i.id
 
   let setup_binfo r p id =
-    let kind = enum_of_kind (kind p) in
+    let kind = enum_of_kind (Prim.kind p) in
     let i = { id; kind; locs = Smap.empty; last_prog = 0 } in 
     Gc.finalise finalise_binfo i;
     set_binfo p i;
@@ -344,14 +342,14 @@ module Prim = struct
   | Some _ -> 
       let update_attr a = ignore (BBuf.setup r (Attr.buf a)) in
       Prim.iter update_attr p; 
-      begin match index p with 
+      begin match Prim.index p with 
       | None -> () 
       | Some b -> ignore (BBuf.setup r b)
       end
   | None -> 
       let id = Gl_hi.gen_vertex_array () in
       let binfo = setup_binfo r p id in
-      let index_id = match index p with 
+      let index_id = match Prim.index p with 
       | None -> 0 
       | Some index -> BBuf.setup r index
       in
@@ -363,11 +361,9 @@ module Prim = struct
       Gl.bind_buffer Gl.element_array_buffer 0
 end
 
-(* Textures *) 
+(* Backend textures *) 
 
-module Tex = struct
-  include Renderer.Private.Tex
-
+module BTex = struct
   let target_enum_of_kind = function 
   | `D1 -> Gl.texture_1d 
   | `D2 -> Gl.texture_2d 
@@ -481,9 +477,9 @@ module Tex = struct
 
   type binfo = { id : Id.t;  }
   let inject, project = BInfo.create () 
-  let binfo p = project (binfo p) 
+  let binfo p = project (Tex.binfo p) 
   let get_binfo p = match binfo p with None -> assert false | Some i -> i 
-  let set_binfo p (i : binfo) = set_binfo p (inject i) 
+  let set_binfo p (i : binfo) = Tex.set_binfo p (inject i) 
 
   let finalise_binfo i = 
     Gl_hi.delete_texture i.id
@@ -538,10 +534,10 @@ module Tex = struct
         Gl.tex_parameteri target Gl.texture_wrap_r wrap_r; 
         Gl.tex_image3d target 0 internal w h d 0 format type_ (`Offset 0);
     | `D2_ms -> 
-        let scount, fixed = multisample t in
+        let scount, fixed = Tex.multisample t in
         Gl.tex_image2d_multisample target scount internal w h fixed;
     | `D3_ms -> 
-        let scount, fixed = multisample t in
+        let scount, fixed = Tex.multisample t in
         Gl.tex_image3d_multisample target scount internal w h d fixed
     | `Buffer -> 
         Gl.tex_buffer target internal buf_id
@@ -560,10 +556,9 @@ module Tex = struct
     id
 end
 
-(* Programs *) 
+(* Backend programs *) 
 
-module Prog = struct
-  include Renderer.Private.Prog 
+module BProg = struct
 
   type attr_type = 
     [ `Float32 of [ `V1 | `V2 | `V3 | `V4 | `M2 | `M3 | `M4 | `M23 | `M24 
@@ -674,11 +669,11 @@ module Prog = struct
       Gl.unsigned_int_vec3, `UInt32 `V3; 
       Gl.unsigned_int_vec4, `UInt32 `V4 ]
 
-  let enum_of_shader_kind = function
+  let enum_of_shader_stage = function
   | `Fragment -> Gl.fragment_shader 
   | `Vertex -> Gl.vertex_shader 
   | `Geometry -> Gl.geometry_shader
-  | _ -> assert false
+  | _ -> failwith "TODO Gl 4."
 
   type attr_binfo = 
     { a_name : string;
@@ -701,9 +696,9 @@ module Prog = struct
     { id = 0; attrs = Smap.empty; uniforms = Smap.empty; } 
 
   let inject, project = BInfo.create ()
-  let binfo prog = project (binfo prog)
+  let binfo prog = project (Prog.binfo prog)
   let get_binfo prog = match binfo prog with None -> assert false | Some i -> i
-  let set_binfo prog (i : binfo) = set_binfo prog (inject i)
+  let set_binfo prog (i : binfo) = Prog.set_binfo prog (inject i)
 
   let finalise_binfo i =
     Gl.delete_program i.id
@@ -766,8 +761,8 @@ module Prog = struct
       | Some _ as lang -> lang
       in
       let src, fmap = Prog.source ?lang shader in
-      let kind = enum_of_shader_kind (Prog.kind shader) in
-      let id = Gl.create_shader kind in
+      let stage = enum_of_shader_stage (Prog.stage shader) in
+      let id = Gl.create_shader stage in
       let ids = `Ok (id :: ids) in
       Gl.shader_source id src;
       Gl.compile_shader id;
@@ -777,8 +772,8 @@ module Prog = struct
   let setup r prog = match binfo prog with
   | Some i -> if i.id = 0 then `Error else `Ok i.id
   | None -> 
-      let supported = Cap.shader_kinds r in
-      let supported s = List.mem (Prog.kind s) supported in 
+      let supported = r.caps.Cap.c_shader_stages in
+      let supported s = List.mem (Prog.stage s) supported in 
       let shaders, unsupported = List.partition supported (Prog.shaders prog) in
       if unsupported <> [] 
       then (log_error r (`Unsupported_shaders (prog, unsupported)); `Error)
@@ -951,8 +946,8 @@ module Prog = struct
               if t == Tex.nil then 
                 log_error r (`Msg (str "%s uniform value is nil texture" name))
               else
-              let tid = Tex.setup r t in
-              let target = Tex.target_enum_of_kind (Tex.kind t) in
+              let tid = BTex.setup r t in
+              let target = BTex.target_enum_of_kind (Tex.kind t) in
               Gl.active_texture (Gl.texture0 + !next_active_tex); 
               Gl.bind_texture target tid;
               Gl.uniform1i u.u_loc !next_active_tex; 
@@ -966,12 +961,12 @@ module Prog = struct
     Smap.iter bind_uniform prog.uniforms 
     
   let bind_prim r prog_binfo prim =
-    let prim_binfo = Prim.get_binfo prim in    
-    Gl.bind_vertex_array prim_binfo.Prim.id;
-    if prim_binfo.Prim.last_prog = prog_binfo.id then () else
+    let prim_binfo = BPrim.get_binfo prim in    
+    Gl.bind_vertex_array prim_binfo.BPrim.id;
+    if prim_binfo.BPrim.last_prog = prog_binfo.id then () else
     begin
       let bind_attr name attr_binfo = 
-        let loc = try Some (Smap.find name prim_binfo.Prim.locs) with
+        let loc = try Some (Smap.find name prim_binfo.BPrim.locs) with
         | Not_found -> None
         in
         match loc with
@@ -1003,23 +998,22 @@ module Prog = struct
       in
       Smap.iter bind_attr prog_binfo.attrs; 
       Gl.bind_buffer Gl.array_buffer 0;
-      prim_binfo.Prim.last_prog <- prog_binfo.id;
+      prim_binfo.BPrim.last_prog <- prog_binfo.id;
     end
    
   let use r id = 
     Gl.use_program id;
 end
 
-(* Effects *) 
+(* Backend effects *) 
 
-module Effect = struct
-  include Renderer.Private.Effect
+module BEffect = struct
 
   let enum_of_raster_face_cull = function 
   | `Front -> Gl.front 
   | `Back -> Gl.back 
 
-  let set_raster_state r = match r.raster_face_cull with 
+  let set_raster_state r = match r.Effect.raster_face_cull with 
   | None -> Gl.disable Gl.cull_face_enum
   | Some cull -> 
       Gl.enable Gl.cull_face_enum; 
@@ -1036,13 +1030,13 @@ module Effect = struct
   | `Always -> Gl.always
 
   let set_depth_state d =
-    Gl.depth_mask d.depth_write;
-    match d.depth_test with 
+    Gl.depth_mask d.Effect.depth_write;
+    match d.Effect.depth_test with 
     | None -> Gl.disable Gl.depth_test
     | Some test -> 
         Gl.enable Gl.depth_test;
         Gl.depth_func (enum_of_depth_test test); 
-        let factor, units = d.depth_offset in 
+        let factor, units = d.Effect.depth_offset in 
         if factor = 0. && units = 0. then Gl.disable Gl.polygon_offset_fill else
         begin 
           Gl.enable Gl.polygon_offset_fill; 
@@ -1083,21 +1077,21 @@ module Effect = struct
       Gl.max, Gl.one (* irrelevant *), Gl.one (* irrelevant *)
 
   let set_blend_state b = 
-    if not b.blend then Gl.disable Gl.blend else
+    if not b.Effect.blend then Gl.disable Gl.blend else
     begin
       Gl.enable Gl.blend;
-      let eq_rgb, a_rgb, b_rgb = enums_of_blend_eq b.blend_rgb in 
-      let eq_a, a_a, b_a = enums_of_blend_eq b.blend_a in
-      let cst = b.blend_cst in
+      let eq_rgb, a_rgb, b_rgb = enums_of_blend_eq b.Effect.blend_rgb in 
+      let eq_a, a_a, b_a = enums_of_blend_eq b.Effect.blend_a in
+      let cst = b.Effect.blend_cst in
       Gl.blend_equation_separate eq_rgb eq_a;
       Gl.blend_func_separate a_rgb b_rgb a_a b_a;
       Color.(Gl.blend_color (r cst) (g cst) (b cst) (a cst))
     end
     
   let set_state r e = 
-    let raster = raster e in 
-    let depth = depth e in 
-    let blend = blend e in 
+    let raster = Effect.raster e in 
+    let depth = Effect.depth e in 
+    let blend = Effect.blend e in 
     if r.raster != raster then (r.raster <- raster; set_raster_state raster);
     if r.depth != depth then (r.depth <- depth; set_depth_state depth);
     if r.blend != blend then (r.blend <- blend; set_blend_state blend);
@@ -1132,7 +1126,7 @@ module Fbuf = struct
         let _ = setup_binfo r b id in
         let w = Float.int_of_round (Size2.w (size2 b)) in 
         let h = Float.int_of_round (Size2.h (size2 b)) in 
-        let f = Tex.internal_format_enum_of_format (sample_format b) in
+        let f = BTex.internal_format_enum_of_format (sample_format b) in
         let m = match multisample b with None -> 0 | Some m -> m in
         Gl.bind_renderbuffer Gl.renderbuffer id;
         Gl.renderbuffer_storage_multisample Gl.renderbuffer m f w h; 
@@ -1163,10 +1157,10 @@ module Fbuf = struct
         let bid = Rbuf_impl.setup r b in
         Gl.framebuffer_renderbuffer Gl.framebuffer pt Gl.renderbuffer bid
     | `Tex (level, t) ->
-        let tid = Tex.setup r t in
+        let tid = BTex.setup r t in
         Gl.framebuffer_texture Gl.framebuffer pt tid level
     | `Tex_layer (level, layer, t) ->
-        let tid = Tex.setup r t in 
+        let tid = BTex.setup r t in 
         Gl.framebuffer_texture_layer Gl.framebuffer pt tid level layer
     in
     match a with 
@@ -1291,65 +1285,65 @@ let init_framebuffer r clear =
   ()
 
 let render_op r prog_binfo op = 
-  Prog.bind_prim r prog_binfo op.prim; 
-  Prog.bind_uniforms r prog_binfo op;
-  Effect.set_state r op.effect;
+  BProg.bind_prim r prog_binfo op.prim; 
+  BProg.bind_uniforms r prog_binfo op;
+  BEffect.set_state r op.effect;
   match Prim.index op.prim with
   | None -> 
-      let prim_binfo = Prim.get_binfo op.prim in
+      let prim_binfo = BPrim.get_binfo op.prim in
       let first = Prim.first op.prim in 
       let count = Prim.count_now op.prim in
-      let mode = prim_binfo.Prim.kind in
+      let mode = prim_binfo.BPrim.kind in
       if op.count = 1
       then Gl.draw_arrays mode first count
       else Gl.draw_arrays_instanced mode first count op.count
   | Some index ->
-      let prim_binfo = Prim.get_binfo op.prim in 
+      let prim_binfo = BPrim.get_binfo op.prim in 
       let index_binfo = BBuf.get_binfo index in
       let first = `Offset (Prim.first op.prim) in 
       let count = Prim.count_now op.prim in 
-      let mode = prim_binfo.Prim.kind in
+      let mode = prim_binfo.BPrim.kind in
       let type_ = index_binfo.BBuf.scalar_type in
       if op.count = 1
       then Gl.draw_elements mode count type_ first
       else Gl.draw_elements_instanced mode count type_ first op.count
-      
+          
 let render_batch r id batch =
-  let prog_binfo = Prog.get_binfo (Effect.prog (List.hd batch).effect) in
-  Prog.use r id; List.iter (render_op r prog_binfo) batch
+  let prog_binfo = BProg.get_binfo (Effect.prog (List.hd batch).effect) in
+  BProg.use r id; List.iter (render_op r prog_binfo) batch
    
 (* Renderer *) 
 
 let name = "Lit %%VERSION%% GL 3.x renderer"
 
+let init r =
+  init_gl_state r; 
+  BEffect.set_raster_state r.raster;
+  BEffect.set_depth_state r.depth;
+  BEffect.set_blend_state r.blend;
+  ()
+
 let create ?compiler_msg_parser log ~debug size = 
   let compiler_msg_parser = match compiler_msg_parser with 
-  | None -> 
-      (* TODO Potentially we'd like to defer that decision in init () 
-         once we have an OpenGL context to recognise drivers and adapt the 
-         default to them. *) 
+  | None -> (* FIXME: we could try to adapt the parser to drivers
+               we recognize through GL_RENDERER, contributions welcome. *)
       Log.compiler_msg_parser_default 
   | Some parser -> parser
   in
-  { init = false;
-    debug; log; compiler_msg_parser; 
-    cleanups = []; 
-    clears = Renderer.clears_default;
-    raster = Lit.Effect.raster_default; 
-    depth = Lit.Effect.depth_default; 
-    blend = Lit.Effect.blend_default;
-    size; 
-    view = View.create ();
-    world_to_clip = lazy M4.id;
-    batches = Imap.empty; 
-    fbuf = Fbuf.default; }
-
-let init r =
-  init_gl_state r; 
-  Effect.set_raster_state r.raster;
-  Effect.set_depth_state r.depth;
-  Effect.set_blend_state r.blend;
-  ()
+  let r = { caps = BCap.get ();
+            debug; log; compiler_msg_parser; 
+            cleanups = []; 
+            clears = Renderer.clears_default;
+            raster = Lit.Effect.raster_default; 
+            depth = Lit.Effect.depth_default; 
+            blend = Lit.Effect.blend_default;
+            size; 
+            view = View.create ();
+            world_to_clip = lazy M4.id;
+            batches = Imap.empty; 
+            fbuf = Fbuf.default; }
+  in
+  (init r; r)
 
 let size r = r.size 
 let set_size r s = r.size <- s
@@ -1361,15 +1355,13 @@ let set_view r view =
 let clears r = r.clears 
 let set_clears r clears = r.clears <- clears
 
-let add_op r op =  
-  if not r.init then (r.init <- true; init r);
-  match Prog.setup r (Effect.prog op.effect) with 
-  | `Error -> () 
-  | `Ok prog_id -> 
-      let batches = try Imap.find prog_id r.batches with Not_found -> [] in
-      r.batches <- Imap.add prog_id (op :: batches) r.batches; 
-      Prim.setup r op.prim
-
+let add_op r op =  match BProg.setup r (Effect.prog op.effect) with 
+| `Error -> ()
+| `Ok prog_id -> 
+    let batches = try Imap.find prog_id r.batches with Not_found -> [] in
+    r.batches <- Imap.add prog_id (op :: batches) r.batches; 
+    BPrim.setup r op.prim
+      
 let fbuf r = r.fbuf
 let set_fbuf r fbuf =
   let id = Fbuf.setup r fbuf in 
@@ -1377,7 +1369,6 @@ let set_fbuf r fbuf =
   r.fbuf <- fbuf
   
 let render r ~clear =
-  if not r.init then (r.init <- true; init r);
   if not (r.cleanups = []) then List.iter (fun clean -> clean ()) r.cleanups;
   init_framebuffer r clear;
   let batches = r.batches in 

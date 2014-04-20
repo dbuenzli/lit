@@ -231,12 +231,11 @@ let rec command r app = function
 
 let main () = 
   let size = Demo.default_size in
+  let app = App.create { App.default with App.size = size; tick_hz = 60; 
+                                          hidpi = false; } in
   let r = Renderer.create ~size (App.select_backend ()) in
   let ev = Demo.ev_of_command_handler (command r) in
-  let app = App.create { App.default with App.size = size; tick_hz = 60; 
-                                          hidpi = false; 
-                                          ev} in
-  App.handle_run app 
+  App.handle_run app ~ev
   
 let () = main ()
 
