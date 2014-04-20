@@ -1411,12 +1411,7 @@ module Renderer : sig
       expose [Lit]'s internals and are subject to change even between 
       minor versions of the library. *)
   module Private : sig
-
-    module Id : sig
-      type t = int
-      val compare : t -> t -> int
-    end
-
+    
     module BInfo : sig
       type t 
       val create : unit -> ('a -> t) * (t -> 'a option)
@@ -1504,7 +1499,6 @@ module Renderer : sig
 
   (** The type for a renderer backend. *) 
   module type T = sig
-    
     type t 
 
     module BCap : sig
@@ -1548,7 +1542,7 @@ module Renderer : sig
     ?compiler_msg_parser:Log.compiler_msg_parser -> 
     ?log:Log.t -> 
     ?debug:bool -> 
-    size:size2 -> 
+    size:size2 ->
     (module T) -> 
     renderer
   (** [creates size b] creates a renderer with backend [b]. 

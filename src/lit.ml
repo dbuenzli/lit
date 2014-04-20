@@ -38,13 +38,6 @@ let err_neg_arg arg v = str "negative argument %s (%d)" arg v
 let err_not_mstex k = str "not a multisample texture (%s) k" k
 let err_mstex = str "can't specify the data of a multisample texture" 
 
-(* Renderer ids. *) 
-
-module Id = struct
-  type t = int 
-  let compare : int -> int -> int = Pervasives.compare
-end
-
 (* Renderer backend info *) 
 
 module BInfo = struct
@@ -1491,8 +1484,7 @@ module Renderer = struct
       (R.BCap.caps r).c_max_render_buffer_size
   end
 
-  module Private = struct    
-    module Id = Id
+  module Private = struct
     module BInfo = BInfo
     module Buf = Buf
     module Attr = Attr

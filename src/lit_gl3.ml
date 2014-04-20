@@ -11,6 +11,13 @@ open Renderer.Private
 
 let str = Printf.sprintf 
 
+(* Renderer ids. *) 
+
+module Id = struct
+  type t = int 
+  let compare : int -> int -> int = Pervasives.compare
+end
+
 module Imap = Map.Make (Id) 
 module Smap = Map.Make (String)
 
