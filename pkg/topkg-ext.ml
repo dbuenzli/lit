@@ -6,7 +6,7 @@
 
 let ( >>= ) v f = match v with `Ok v -> f v | `Error _ as e -> e  
 let ( &>>= ) v f = match v with 
-| `Ok v -> f v | `Error e -> Printf.eprintf "%s: %s" Sys.argv.(0) e; exit 1
+| `Ok v -> f v | `Error e -> Printf.eprintf "%s: %s\n%!" Sys.argv.(0) e; exit 1
 
 type 'a result = [ `Ok of 'a | `Error of string ] 
 
@@ -197,6 +197,7 @@ module Git : sig
       is chopped. *)
 end = struct
   let describe ?(chop_v = false) branch =
+    if not (Dir.exists ".git") then "not-a-git-checkout" else
     Cmd.read (Printf.sprintf "git describe %s" branch) &>>= fun d ->
     let len = String.length d in
     if chop_v && len > 0 && d.[0] = 'v' then String.sub d 1 (len - 2) else 
@@ -223,12 +224,17 @@ module Config_default : sig
   val distrib_hook : string option 
   (** [distrib_hook] is an ocaml script to invoke before trying 
       to build the distribution. *)
+
+  val www_demos : string list 
+  (** [www_demos] is a list of build targets that represent single page
+      js_of_ocaml demo. *)
 end = struct
   let subst_skip = [".git"; ".png"; ".jpeg"; ".otf"; ".ttf"; ".pdf" ]
   let vars = []
   let git_hook = None
   let distrib_remove = [".git"; ".gitignore"; "build"]
   let distrib_hook = None
+  let www_demos = [] 
 end
 
 
