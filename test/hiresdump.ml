@@ -38,7 +38,7 @@ let rot = ref None
 
 (* Render *) 
 
-let draw r = 
+let draw r =
   (* Render back faces *)
   let op = Renderer.op back ~tr:(M4.of_quat !prim_tr) !prim in
   Renderer.add_op r op;
@@ -54,35 +54,78 @@ let resize r size =
   let clears = { Fbuf.clears_default with 
                  Fbuf.clear_color = Some Color.white }
   in
-  let aspect = Size2.w size /. Size2.h size in
+  let aspect = Size2.aspect size in
   let view = 
     let tr = View.look ~at:P3.o ~from:!from () in 
     let fov = `H Float.pi_div_4 in 
     let proj = View.persp ~fov ~aspect ~near:0.1 ~far:10. in
     View.create ~tr ~proj ()
   in
+  Format.printf "Setting size: %a@." V2.pp size;
   Renderer.set_size r size;
   Renderer.set_view r view;
-  Fbuf.set_clears Fbuf.default clears;  
+  Fbuf.set_clears (Renderer.fbuf r) clears;
   ()
 
-let draw r app = draw r; App.update_surface app
+let msample_fb r size = 
+  let scount = Renderer.Cap.max_samples r in
+  let scount = 0 in
+  let color = Fbuf.Rbuf.create ~multisample:scount size (`D4 (`UInt8, true))in 
+  let depth = Fbuf.Rbuf.create ~multisample:scount size (`Depth `UInt24) in
+  let fb = Fbuf.create [`Color (0, `Rbuf color); `Depth (`Rbuf depth)] in
+  let status = Fbuf.status r fb in
+  assert (status = `Complete);
+  fb
 
-let dump r app =
-  let box = Box2.v P2.o (App.surface_size app) in
+let color_fb r size = 
+  let color = Fbuf.Rbuf.create size (`D4 (`UInt8, true))in 
+  let fb = Fbuf.create [`Color (0, `Rbuf color); ] in
+  let status = Fbuf.status r fb in
+  assert (status = `Complete) ;
+  fb 
+  
+let offline_hiq_fb r app aspect = 
+  let size =
+    let max = float (Renderer.Cap.max_render_buffer_size r / 2) in 
+    if aspect > 1. 
+    then Size2.v max (Float.round (max /. aspect))
+    else Size2.v (Float.round (max *. aspect)) max 
+  in
+  let size = V2.(4. * App.surface_size app) in
+  let mfb = msample_fb r size in 
+  let cfb = color_fb r size in
+  mfb, cfb, size
+
+let hi_dump r app =
+  let aspect = Size2.aspect (App.surface_size app) in
+  let mfb, cfb, size = offline_hiq_fb r app aspect in
+  let box = Box2.v P2.o size in
   let w = Float.int_of_round (Box2.w box) in 
   let h = Float.int_of_round (Box2.h box) in
-  let fmt = Raster.Sample.(format rgb_l `UInt8) in
+  let fmt = Raster.Sample.(format rgba_l `UInt8) in
   let scalar_count = Raster.Sample.scalar_count ~w ~h fmt in
-  let buf = Buf.create (`Gpu (`UInt8, scalar_count)) in 
-  Fbuf.read r Fbuf.default (`Color_rgb 0) box buf; 
+  let buf = Buf.create (`Gpu (`UInt8, scalar_count)) in
+  let saved_fb = Renderer.fbuf r in
+  let restore () =
+    Renderer.set_fbuf r saved_fb;
+    resize r (App.surface_size app);
+  in
+  Renderer.set_fbuf r mfb; 
+  resize r size;
+  draw r;
+  App.update_surface app;
+  restore ();
+  Fbuf.blit r [`Color] ~src:mfb box ~dst:cfb box; 
+  Fbuf.read r cfb (`Color_rgba 0) box buf;
   let ba = Buf.gpu_map r `R buf Ba.UInt8 in
   let fname = "/tmp/out.tga" in
-  begin match Tga.write fname `Color_rgb (Box2.size box) ba with 
+  begin match Tga.write fname `Color_rgba (Box2.size box) ba with 
   | `Ok () -> () | `Error e -> Printf.eprintf "%s: %s" fname e
   end;
   Buf.gpu_unmap r buf;
   `Ok 
+
+let draw r app = draw r; App.update_surface app
 
 let rec command r app = function 
 | `Init -> resize r (App.surface_size app); `Ok 
@@ -118,7 +161,7 @@ let rec command r app = function
     | `Mouse (`Motion (pt, _)) -> command r app (`Rot_update pt)
     | `Key (`Down, (`Uchar 0x0064)) -> 
         Format.printf "dumping@.";
-        dump r app
+        hi_dump r app
     | _ -> `Ok
     end
 | _ -> `Ok

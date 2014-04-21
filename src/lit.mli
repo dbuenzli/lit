@@ -868,7 +868,7 @@ end
 (** Effects.
 
     An effect defines a configuration of the graphics pipeline or 
-    a list of effects for rendering a {!Geometry.t} value. 
+    a list of effects for rendering a {!prim} value. 
 
     {b TODO.} Pretty printers. *)
 module Effect : sig
@@ -887,10 +887,7 @@ module Effect : sig
   val raster_default : raster
   (** [raster_default] is [{ cull = None }]. *) 
 
-  (** {1 Depth state} 
-
-      {b Note.} Depth clearing and depth range are specified 
-      in renderer {!Renderer.clear}. *)
+  (** {1 Depth state} *)
 
   type depth_test = 
     [ `Never | `Less | `Equal | `Lequal | `Greater | `Nequal 
@@ -1233,7 +1230,7 @@ module Fbuf : sig
   val status : renderer -> fbuf -> status
   (** [status r fb] is [fb]'s status. *) 
 
-  (** {1 Framebuffer reading} *) 
+  (** {1 Framebuffer reading and blitting} *) 
   
   type read = 
     [ `Color_r of int 
@@ -1260,6 +1257,25 @@ module Fbuf : sig
       scalar type of [buf] is not [`UInt32] (the data is packed as 24
       bits of depth and 8 bits of stencil) or if [is_multisample fb] is 
       [true]. *)
+
+  type blit_buffer = [ `Color | `Depth | `Stencil ] 
+  (** The type for framebuffer buffers to blit. *) 
+
+  type blit_filter = [ `Nearest | `Linear ] 
+  (** The type for blit filter if the blit is only on [`Color] buffer. *) 
+
+  val blit : ?filter:blit_filter -> renderer -> blit_buffer list -> 
+    src:fbuf -> box2 -> dst:fbuf -> box2 -> unit
+  (** [blit filter r src sbox dst dbox] blits between the buffers bufs
+      [src] and [dfb]. [blit_filter] defaults to [`Nearest] and 
+      can be only set to [`Linear] for blits that involve only 
+      color buffers.
+
+      {b TODO.} No way to specify color attachement. 
+
+      {b FIXME.} There are a lot of things to
+      {{:http://www.opengl.org/wiki/Framebuffer#Blitting}consider}
+      for this operation. We should try to make more checks. *)
 end
 
 type op = 
@@ -1526,6 +1542,8 @@ module Renderer : sig
       val status : t -> fbuf -> Fbuf.status
       val read : t -> fbuf -> Fbuf.read -> 
         box2 -> first:int -> w_stride:int option -> buf -> unit
+      val blit : t -> Fbuf.blit_filter -> Fbuf.blit_buffer list -> 
+        src:fbuf -> box2 -> dst:fbuf -> box2 -> unit
     end
 
     val name : string

@@ -36,3 +36,5 @@
   in pair with multipass and opacity and view setup. 
   Maybe we should leave the sorting to higher-level abstractions and
   Renderer should be immediate mode. 
+
+* Test fb with multiple color attachements. 

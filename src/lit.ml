@@ -369,6 +369,9 @@ module Fbuf_types = struct
     | `Depth
     | `Stencil 
     | `Depth_stencil ]
+
+  type blit_buffer = [ `Color | `Depth | `Stencil ] 
+  type blit_filter = [ `Nearest | `Linear ]
 end
 
 type fbuf = Fbuf_types.t
@@ -438,6 +441,8 @@ module Renderer_types = struct
       val status : t -> fbuf -> Fbuf_types.status
       val read : t -> fbuf -> Fbuf_types.read -> 
         box2 -> first:int -> w_stride:int option -> buf -> unit
+      val blit : t -> Fbuf_types.blit_filter -> Fbuf_types.blit_buffer list -> 
+        src:fbuf -> box2 -> dst:fbuf -> box2 -> unit
     end
 
     val name : string
@@ -1391,6 +1396,9 @@ module Fbuf = struct
     if read = `Depth_stencil && Buf.scalar_type buf <> `UInt32 
     then invalid_arg err_fb_read_depth_stencil else
     R.BFbuf.read r fb read box ~first ~w_stride buf
+
+  let blit ?(filter = `Nearest) (R ((module R), r)) bs ~src sbox ~dst dbox = 
+    R.BFbuf.blit r filter bs ~src sbox ~dst dbox
         
   (* Backend info *) 
 

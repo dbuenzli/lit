@@ -129,7 +129,7 @@ type t =
     mutable raster : Effect.raster; (* Last setup raster state *) 
     mutable depth : Effect.depth;   (* Last setup depth state *) 
     mutable blend : Effect.blend;   (* Last setup blend state *)
-    mutable fbuf : fbuf;
+    mutable fbuf : fbuf;            (* The framebuffer to act on. *) 
     mutable size : size2;
     mutable view : view;
     mutable world_to_clip : m4 Lazy.t; (* cache *) 
@@ -1199,7 +1199,7 @@ module BFbuf = struct
         set_binfo r fb { id; }; 
         Gl.bind_framebuffer Gl.framebuffer id;
         List.iter (attach r) (Fbuf.attachements fb);
-        Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf);
+        Gl.bind_framebuffer Gl.framebuffer 0;
         id
 
   let status_enum_to_variant = 
@@ -1236,25 +1236,22 @@ module BFbuf = struct
         clear_mask := Gl.(!clear_mask + stencil_buffer_bit)
     end;
     if !clear_mask <> 0 then Gl.clear !clear_mask
-        
-  let clear r fb = 
-    if r.fbuf == fb then raw_clear (Fbuf.clears fb) else 
-    let id = setup r fb in 
+
+  let clear r fb =
+    let id = setup r fb in
     Gl.bind_framebuffer Gl.framebuffer id; 
     raw_clear (Fbuf.clears fb); 
-    Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf)
-
-  let raw_status () = 
-    status_enum_to_variant (Gl.check_framebuffer_status Gl.framebuffer)
+    Gl.bind_framebuffer Gl.framebuffer 0
 
   let status r fb =
-    if r.fbuf == fb then raw_status () else
     let id = setup r fb in 
     Gl.bind_framebuffer Gl.framebuffer id; 
-    let status = raw_status () in  
-    Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf); status
-
-  let raw_read r fb rb box ~first ~w_stride buf = 
+    let status = Gl.check_framebuffer_status Gl.framebuffer in
+    Gl.bind_framebuffer Gl.framebuffer 0; status_enum_to_variant status
+  
+  let read r fb rb box ~first ~w_stride buf = 
+    (* bind immediately Gl.read_buffer is part of framebuffer state *)
+    Gl.bind_framebuffer Gl.framebuffer (setup r fb); 
     let st = Buf.scalar_type buf in
     let first = first * (Ba.scalar_type_byte_count st) in 
     let st = BBuf.enum_of_scalar_type st in
@@ -1284,14 +1281,34 @@ module BFbuf = struct
     Gl.pixel_storei Gl.pack_row_length row_length; 
     Gl.bind_buffer Gl.pixel_pack_buffer bid; 
     Gl.read_pixels x y w h fmt st (`Offset first);
-    Gl.bind_buffer Gl.pixel_pack_buffer 0
+    Gl.bind_buffer Gl.pixel_pack_buffer 0;
+    Gl.bind_framebuffer Gl.framebuffer 0
+      
+  let rec mask_of_blit_buffers acc = function
+  | `Color :: bs -> mask_of_blit_buffers (Gl.color_buffer_bit lor acc) bs
+  | `Depth :: bs -> mask_of_blit_buffers (Gl.depth_buffer_bit lor acc) bs 
+  | `Stencil :: bs -> mask_of_blit_buffers (Gl.stencil_buffer_bit lor acc) bs
+  | [] -> acc
   
-  let read r fb rb box ~first ~w_stride buf = 
-    if r.fbuf == fb then raw_read r fb rb box ~first ~w_stride buf else
-    let id = setup r fb in 
-    Gl.bind_framebuffer Gl.framebuffer id; 
-    raw_read r fb rb box ~first ~w_stride buf;
-    Gl.bind_framebuffer Gl.framebuffer (setup r r.fbuf)
+  let enum_of_filter = function `Linear -> Gl.linear | `Nearest -> Gl.nearest
+  
+  let blit r filter bs ~src sbox ~dst dbox = 
+    let sid = setup r src in 
+    let did = setup r dst in 
+    let sminx = Float.int_of_round (Box2.minx sbox) in 
+    let sminy = Float.int_of_round (Box2.miny sbox) in 
+    let smaxx = Float.int_of_round (Box2.maxx sbox) in 
+    let smaxy = Float.int_of_round (Box2.maxy sbox) in
+    let dminx = Float.int_of_round (Box2.minx dbox) in 
+    let dminy = Float.int_of_round (Box2.miny dbox) in 
+    let dmaxx = Float.int_of_round (Box2.maxx dbox) in 
+    let dmaxy = Float.int_of_round (Box2.maxy dbox) in
+    let m = mask_of_blit_buffers 0 bs in 
+    let f = enum_of_filter filter in
+    Gl.bind_framebuffer Gl.read_framebuffer sid;
+    Gl.bind_framebuffer Gl.draw_framebuffer did; 
+    Gl.blit_framebuffer sminx sminy smaxx smaxy dminx dminy dmaxx dmaxy m f;
+    Gl.bind_framebuffer Gl.framebuffer 0
 end
 
 
@@ -1302,7 +1319,7 @@ let init_gl_state r =
   Gl.blend_func Gl.src_alpha Gl.one_minus_src_alpha;
   ()
 
-let init_framebuffer r clear =
+let setup_framebuffer r clear =
   let viewport = View.viewport r.view in
   let o = V2.mul (Box2.o viewport) r.size in
   let ox = Float.int_of_round (P2.x o) in
@@ -1312,7 +1329,8 @@ let init_framebuffer r clear =
   let h = Float.int_of_round (Size2.h size) in 
   Gl.viewport ox oy w h; 
   Gl.scissor ox oy w h;
-  if clear then BFbuf.clear r r.fbuf;
+  Gl.bind_framebuffer Gl.framebuffer (BFbuf.setup r r.fbuf);
+  if clear then BFbuf.raw_clear (Fbuf.clears r.fbuf);
   ()
 
 let render_op r prog_binfo op = 
@@ -1403,7 +1421,7 @@ let cleanup r =
 
 let render r ~clear =
   if not (r.cleanups = []) then cleanup r; 
-  init_framebuffer r clear;
+  setup_framebuffer r clear;
   let batches = r.batches in 
   r.batches <- Imap.empty;
   Imap.iter (render_batch r) batches;
