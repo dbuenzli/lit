@@ -1270,8 +1270,6 @@ module BFbuf = struct
     | `Color_rgba c -> Gl.read_buffer (mode c); Gl.rgba, st
     | `Depth -> Gl.read_buffer Gl.back; Gl.depth_component, st
     | `Depth_stencil -> 
-        if Buf.scalar_type buf <> `UInt32 
-        then invalid_arg "buffer must be of scalar type `UInt32";
         Gl.read_buffer Gl.back; Gl.depth_stencil, Gl.unsigned_int_24_8
     | `Stencil ->
         Gl.read_buffer Gl.back; Gl.stencil_index, st                          

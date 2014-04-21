@@ -1196,6 +1196,12 @@ module Fbuf : sig
   val attachements : fbuf -> attachement list 
   (** [attachements fb] is [fb]'s attachements. Irrelevant on {!default}. *) 
 
+  val is_multisample : fbuf -> bool
+  (** [is_multisample fb] is [true] if [fb] is a multisample
+      framebuffer.  Always [false] on {!default}, though not entirely
+      accurate it's always possible to {!read} from a multisample
+      framebuffer.  *)
+
   val clears : fbuf -> clears
   (** [clears fb] is [fb]'s clears. *)
 
@@ -1251,8 +1257,9 @@ module Fbuf : sig
       to move from line to line.
 
       @raise Invalid_argument if [`Depth_stencil] is used and the
-      scalar type of [buf] is not `UInt32 (the data is packed as 24
-      bits of depth and 8 bits of stencil). *) 
+      scalar type of [buf] is not [`UInt32] (the data is packed as 24
+      bits of depth and 8 bits of stencil) or if [is_multisample fb] is 
+      [true]. *)
 end
 
 type op = 

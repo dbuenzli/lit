@@ -37,7 +37,10 @@ let err_miss_uniform k = str "no uniform %s" k
 let err_neg_arg arg v = str "negative argument %s (%d)" arg v
 let err_not_mstex k = str "not a multisample texture (%s) k" k
 let err_mstex = str "can't specify the data of a multisample texture" 
-
+let err_fb_read_msample = str "can't read a multisample buffer"
+let err_fb_read_depth_stencil = 
+  str "can only read back `Depth_stencil with an `UInt32 buffer"
+    
 module Smap = Map.Make(String) 
 
 (* Backend info *) 
@@ -341,6 +344,7 @@ module Fbuf_types = struct
 
   type t = 
     { attachements : attachement list; 
+      is_multisample : bool;
       mutable clears : clears;
       mutable binfo : BInfo.t }
 
@@ -1341,14 +1345,27 @@ module Fbuf = struct
       clear_stencil = None; }
   
   let default = 
-    { attachements = []; 
+    { attachements = [];
+      is_multisample = false;
       clears = clears_default;
       binfo = BInfo.none }
 
+  let attachement_image = function 
+  | `Color (_, i) | `Depth i | `Depth_stencil i | `Stencil i -> i
+
   let create ?(clears = clears_default) attachements = 
-    { attachements; clears; binfo = BInfo.none }
+    let is_multisample = 
+      let ms_attach a = match attachement_image a with
+      | `Rbuf b -> Rbuf.multisample b <> None
+      | `Tex (_, t) | `Tex_layer (_, _, t) -> 
+          match Tex.kind t with `D2_ms | `D3_ms -> true | _ -> false 
+      in
+      List.exists ms_attach attachements    
+    in
+    { attachements; is_multisample; clears; binfo = BInfo.none }
 
   let attachements fb = fb.attachements
+  let is_multisample fb = fb.is_multisample
   let clears fb = fb.clears
   let set_clears fb clears = fb.clears <- clears 
 
@@ -1369,6 +1386,10 @@ module Fbuf = struct
 
   let status (R ((module R), r)) fb = R.BFbuf.status r fb        
   let read ?(first = 0) ?w_stride (R ((module R), r)) fb read box buf = 
+    if is_multisample fb 
+    then invalid_arg err_fb_read_msample else 
+    if read = `Depth_stencil && Buf.scalar_type buf <> `UInt32 
+    then invalid_arg err_fb_read_depth_stencil else
     R.BFbuf.read r fb read box ~first ~w_stride buf
         
   (* Backend info *) 
