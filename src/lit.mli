@@ -156,12 +156,18 @@ module Buf : sig
       @raise Invalid_argument if [st] does not match [buf]'s
       scalar type. *)
 
+(*
+  val gpu_map_buffer : renderer -> [ `R | `W | `RW ] -> buf -> Gg.buffer 
+  (** [gpu_map_buffer] is like {!gpu_map} but returns a {!Gg.buffer}
+      value. *)
+*)
+
   val gpu_unmap : renderer -> buf -> unit
   (** [gpu_unmap r b] unmaps the buffer [b]. 
       
       {b Warning.} This invalidates the memory pointed to 
-      by the bigarray returned by {!map}, do not try to 
-      access it after this function has been called it may
+      by the bigarray returned by {!gpu_map} or {!gpu_map_buffer}, do not 
+      try to access it after this function has been called it may
       result in program termination. *)
 
   (** {1 CPU buffer} *) 
@@ -180,14 +186,21 @@ module Buf : sig
       
       @raise Invalid_argument if scalar type [st] is not the 
       scalar type of [b]. *)
-      
+
+  val cpu_buffer : buf -> Gg.buffer option
+  (** [cpu_buffer] is like {!cpu} but returns a {!Gg.buffer} value. *) 
+                         
   val get_cpu : buf -> ('a, 'b) Ba.ba_scalar_type -> ('a, 'b) bigarray 
   (** [get_cpu b st] is [cpu b st] but raises if there's no 
       cpu buffer.
       
       @raise Invalid_argument if [cpu b st] raises or if 
       [cpu_exists b] is [false]. *) 
-      
+
+  val get_cpu_buffer : buf -> Gg.buffer
+  (** [get_cpu_buffer] is like {!get_cpu} but returns a {!Gg.buffer}
+      value *) 
+
   val set_cpu : buf -> ('a, 'b) bigarray option -> unit
   (** [set_cpu b ba] sets the CPU buffer of [b] to [ba]. 
       
@@ -196,7 +209,10 @@ module Buf : sig
       
       @raise Invalid_argument if the bigarray kind of [b] is not compatible
       with the scalar type of [b]. *) 
-    
+
+  val set_cpu_buffer : buf -> Gg.buffer option -> unit
+  (** [set_cpu_buffer] is like {!set_cpu} but uses a {!Gg.buffer} value. *) 
+
   val cpu_autorelease : buf -> bool 
   (** [cpu_autorelease buf] is [true] if the CPU buffer is set to [None]
       once uploaded to the GPU. *)
@@ -1424,7 +1440,7 @@ module Renderer : sig
     
   val set_fbuf : renderer -> fbuf -> unit
   (** [set_fbuf r fbuf] sets the framebuffer to [fbuf]. *) 
-     
+
   (** {1 Rendering} *) 
 
   val render : ?clear:bool -> renderer -> unit
@@ -1571,7 +1587,7 @@ module Renderer : sig
   val create : 
     ?compiler_msg_parser:Log.compiler_msg_parser -> 
     ?log:Log.t -> 
-    ?debug:bool -> 
+    ?debug:bool ->
     size:size2 ->
     (module T) -> 
     renderer

@@ -1,4 +1,4 @@
-
+* `Buf.gpu_map_buffer : ... buf -> Gg.buffer` 
 * `Lig_gl` raster, depth, blend state setup, compare with 
    the old value before submitting GL calls.
 * `Lit_gl` cache bound framebuffer to avoid framebuffer bindings.

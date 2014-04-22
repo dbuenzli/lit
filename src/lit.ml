@@ -566,9 +566,24 @@ module Buf = struct
         (* FIXME can we do something here ? *) 
         (Obj.magic (Some ba) : (a, b) bigarray option)
 
+  let cpu_buffer b = match b.cpu with 
+  | None -> None 
+  | Some (Ba ba) -> 
+      let data = match b.scalar_type with 
+      | `Float16 -> Some `Float 
+      | `UInt32 -> Some `Unsigned 
+      | `UInt64 -> Some `Unsigned 
+      | _ -> None 
+      in
+      Some (Ba.Buffer.of_bigarray ?data ba)
+      
   let get_cpu b st = match cpu b st with 
   | None -> invalid_arg err_no_cpu_buffer
   | Some cpu -> cpu 
+
+  let get_cpu_buffer b = match cpu_buffer b with 
+  | None -> invalid_arg err_no_cpu_buffer 
+  | Some cpu -> cpu
 
   let check_kind b k =
     let open Bigarray in
@@ -589,6 +604,22 @@ module Buf = struct
   let set_cpu b = function 
   | None -> b.cpu <- None
   | Some ba -> check_kind b (Bigarray.Array1.kind ba); b.cpu <- Some (Ba ba)
+
+  let set_cpu_buffer b = function 
+  | None -> b.cpu <- None 
+  | Some buf ->
+      match buf with 
+      | `Int8 ba -> b.cpu <- Some (Ba ba)
+      | `Int16 ba -> b.cpu <- Some (Ba ba)
+      | `Int32 ba -> b.cpu <- Some (Ba ba) 
+      | `Int64 ba -> b.cpu <- Some (Ba ba) 
+      | `UInt8 ba -> b.cpu <- Some (Ba ba) 
+      | `UInt16 ba -> b.cpu <- Some (Ba ba) 
+      | `UInt32 ba -> b.cpu <- Some (Ba ba) 
+      | `UInt64 ba -> b.cpu <- Some (Ba ba) 
+      | `Float16 ba -> b.cpu <- Some (Ba ba) 
+      | `Float32 ba -> b.cpu <- Some (Ba ba) 
+      | `Float64 ba -> b.cpu <- Some (Ba ba)
 
   let cpu_p b = b.cpu
   let set_cpu_p b cpu = b.cpu <- Some cpu 
