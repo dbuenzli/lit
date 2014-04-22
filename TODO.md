@@ -1,4 +1,6 @@
 
+* `Lig_gl` raster, depth, blend state setup, compare with 
+   the old value before submitting GL calls.
 * `Lit_gl` cache bound framebuffer to avoid framebuffer bindings.
 * `Uniform.viewport_{o,size}` should we still have them in normalized
   surface coordinate and have a seperate `surface_size` builtin ?

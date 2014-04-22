@@ -262,7 +262,10 @@ type prog = Prog_types.t
 
 module Effect_types = struct
   type raster_face_cull = [ `Front | `Back ] 
-  type raster = { raster_face_cull : raster_face_cull option } 
+  type raster = 
+    { raster_face_cull : raster_face_cull option;
+      raster_multisample : bool; } 
+
   type depth_test = 
     [ `Never | `Less | `Equal | `Lequal | `Greater | `Nequal | `Gequal 
     | `Always ]
@@ -1281,7 +1284,9 @@ module Effect = struct
 
   (* Rasterization state *) 
  
-  let raster_default = { raster_face_cull = None } 
+  let raster_default = 
+    { raster_face_cull = None; 
+      raster_multisample = true; } 
 
   (* Depth state *) 
 

@@ -1047,11 +1047,16 @@ module BEffect = struct
   | `Front -> Gl.front 
   | `Back -> Gl.back 
 
-  let set_raster_state r = match r.Effect.raster_face_cull with 
-  | None -> Gl.disable Gl.cull_face_enum
-  | Some cull -> 
-      Gl.enable Gl.cull_face_enum; 
-      Gl.cull_face (enum_of_raster_face_cull cull)
+  let set_raster_state r = 
+    begin match r.Effect.raster_face_cull with 
+    | None -> Gl.disable Gl.cull_face_enum
+    | Some cull -> 
+        Gl.enable Gl.cull_face_enum; 
+        Gl.cull_face (enum_of_raster_face_cull cull)
+    end; 
+    if r.Effect.raster_multisample 
+    then Gl.enable Gl.multisample 
+    else Gl.disable Gl.multisample
 
   let enum_of_depth_test = function 
   | `Less ->  Gl.less

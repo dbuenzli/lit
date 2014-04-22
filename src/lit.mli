@@ -873,19 +873,23 @@ end
     {b TODO.} Pretty printers. *)
 module Effect : sig
 
-  (** {1 Rasterization state} 
-
-      {b Note.} Faces with a counter clockwise orientation are front 
-      faces. *) 
+  (** {1 Rasterization state} *) 
 
   type raster_face_cull = [ `Front | `Back ] 
-  (** The type for face culling. *) 
+  (** The type for face culling. Faces with a counter clockwise 
+      orientation are front faces. *) 
                           
-  type raster = { raster_face_cull : raster_face_cull option } 
+  type raster = 
+    { raster_face_cull : raster_face_cull option; 
+      raster_multisample : bool; } 
   (** The type for raster state. *) 
 
   val raster_default : raster
-  (** [raster_default] is [{ cull = None }]. *) 
+  (** [raster_default] is the default raster state:
+      {ul 
+      {- [raster_default.raster_face_cull] is [None].}
+      {- [raster_default.raster_multisample] is [true].}} *)
+
 
   (** {1 Depth state} *)
 
