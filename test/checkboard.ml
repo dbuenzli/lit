@@ -10,14 +10,14 @@ open Gg
 open Lit
 
 let checkboard_raster () = 
-  let w, h = 64, 64 in
+  let size = `D2 (Size2.v 64. 64.) in
   let sf = Raster.Sample.(format rgb_l `UInt8) in
-  let len = Raster.Sample.scalar_count ~w ~h sf in
+  let len = Raster.Sample.scalar_count size sf in
   let buf = Ba.create Ba.UInt8 len in
-  let img = Raster.v ~w ~h sf (`UInt8 buf) in 
+  let img = Raster.v size sf (`UInt8 buf) in 
   let i = ref 0 in
-  for y = 0 to h - 1 do
-    for x = 0 to w - 1 do
+  for y = 0 to Raster.hi img - 1 do
+    for x = 0 to Raster.wi img - 1 do
       let xm = if x land 8 = 0 then 1 else 0 in 
       let ym = if y land 8 = 0 then 1 else 0 in 
       let l = (xm lxor ym) * 225 in

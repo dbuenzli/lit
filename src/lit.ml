@@ -863,18 +863,13 @@ module Tex = struct
   let init_of_raster ?(buf = true) ?cpu_autorelease ?usage ?kind ?sample_format
       ?(norm = true) r =
     let sample_format = init_sample_format_of_raster r norm sample_format in
-    let kind = match kind with 
-    | Some k -> k
-    | None -> 
-        if Raster.d r > 1 then `D3 else 
-        if Raster.h r > 1 then `D2 else `D1
-    in
+    let kind = match kind with Some k -> k | None -> (Raster.kind r :> kind) in
     let buf = 
       if not buf || kind = `Buffer then None else
       Some (Buf.create ?cpu_autorelease ?usage (Raster.buffer r))
     in
     match kind with 
-    | `D1 -> `D1 (sample_format, float (Raster.w r), buf)
+    | `D1 -> `D1 (sample_format, (Raster.size1 r), buf)
     | `D2 -> `D2 (sample_format, (Raster.size2 r), buf)
     | `D3 -> `D3 (sample_format, (Raster.size3 r), buf)
     | `Buffer -> 

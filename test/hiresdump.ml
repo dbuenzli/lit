@@ -71,7 +71,6 @@ let resize r size =
 
 let msample_fb r size = 
   let scount = Renderer.Cap.max_samples r in
-  let scount = 0 in
   let color = Fbuf.Rbuf.create ~multisample:scount size (`D4 (`UInt8, true))in 
   let depth = Fbuf.Rbuf.create ~multisample:scount size (`Depth `UInt24) in
   let fb = Fbuf.create [`Color (0, `Rbuf color); `Depth (`Rbuf depth)] in
@@ -87,12 +86,6 @@ let color_fb r size =
   fb 
   
 let offline_hiq_fb r app aspect = 
-  let size =
-    let max = float (Renderer.Cap.max_render_buffer_size r / 2) in 
-    if aspect > 1. 
-    then Size2.v max (Float.round (max /. aspect))
-    else Size2.v (Float.round (max *. aspect)) max 
-  in
   let size = V2.(4. * App.surface_size app) in
   let mfb = msample_fb r size in 
   let cfb = color_fb r size in
@@ -102,10 +95,8 @@ let hi_dump r app =
   let aspect = Size2.aspect (App.surface_size app) in
   let mfb, cfb, size = offline_hiq_fb r app aspect in
   let box = Box2.v P2.o size in
-  let w = Float.int_of_round (Box2.w box) in 
-  let h = Float.int_of_round (Box2.h box) in
   let fmt = Raster.Sample.(format rgba_l `UInt8) in
-  let scalar_count = Raster.Sample.scalar_count ~w ~h fmt in
+  let scalar_count = Raster.Sample.scalar_count (`D2 (Box2.size box)) fmt in
   let buf = Buf.create (`Gpu (`UInt8, scalar_count)) in
   let saved_fb = Renderer.fbuf r in
   let restore () =
