@@ -61,8 +61,8 @@ module Prim = struct
       | Some tex -> [ Attr.create ~stride ~first:dim tex ~dim:2 b ]
     in
     let index = 
-      (* TODO use int16_unsigned if there are too many verts. *) 
-      let b = Ba.create Ba.UInt8 (xseg * yseg * 2 * 3) in 
+      (* TODO use adapt index size according to number of tris *)
+      let b = Ba.create Ba.UInt16 (xseg * yseg * 2 * 3) in 
       let id x y = y * (xseg + 1) + x in 
       let push = pusher Ba.set_3d b in
       for y = 0 to yseg - 1 do 
@@ -71,7 +71,7 @@ module Prim = struct
           push (id x y) (id (x+1) (y+1)) (id (x  ) (y+1))
         done
       done;
-      Buf.create (`UInt8 b)
+      Buf.create (`UInt16 b)
     in
     Prim.create ?tr ?name ~index `Triangles attrs 
 
