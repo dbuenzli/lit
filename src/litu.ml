@@ -26,27 +26,17 @@ module Prim = struct
     let i = ref 0 in 
     fun x y z -> set b !i x y z; i := !i + 3
 
-  let rect ?tr ?name ?tex ?(segs = Size2.unit) ?(d2 = false) spec =
+  let rect ?tr ?name ?tex ?(segs = Size2.unit) ?(d2 = false) box =
     let do_tex = tex <> None in
     let xseg = Float.int_of_round (Size2.w segs) in
     let yseg = Float.int_of_round (Size2.h segs) in
     let attrs = 
       let xsegf = float xseg in 
       let ysegf = float yseg in 
-      let dx, dy, x0, y0 = match spec with 
-      | `Size s -> 
-          let dx = Size2.w s /. xsegf in 
-          let dy = Size2.h s /. ysegf in 
-          let x0 = -0.5 *. Size2.w s in 
-          let y0 = -0.5 *. Size2.h s in
-          dx, dy, x0, y0
-      | `Box b -> 
-          let dx = Size2.w (Box2.size b) /. xsegf in 
-          let dy = Size2.h (Box2.size b) /. ysegf in
-          let x0 = Box2.minx b in 
-          let y0 = Box2.miny b in 
-          dx, dy, x0, y0
-      in
+      let dx = Size2.w (Box2.size box) /. xsegf in 
+      let dy = Size2.h (Box2.size box) /. ysegf in
+      let x0 = Box2.minx box in 
+      let y0 = Box2.miny box in
       let vertex_count = (xseg + 1) * (yseg + 1) in
       let tex_size = if do_tex then 2 * vertex_count else 0 in
       let i = ref 0 in
@@ -85,19 +75,15 @@ module Prim = struct
     in
     Prim.create ?tr ?name ~index `Triangles attrs 
 
-  let cuboid_extrema = function
-  | `Size s -> 
-      let hw, hh, hd = V3.(to_tuple (0.5 * s)) in
-      (-.hw, -.hh, hd), (hw, hh, -.hd)
-  | `Box b -> 
-      if Box3.is_empty b then (0., 0., 0.), (0., 0., 0.) else
-      V3.to_tuple (Box3.min b), V3.to_tuple (Box3.max b)
+  let cuboid_extrema box = 
+    if Box3.is_empty box then (0., 0., 0.), (0., 0., 0.) else
+    V3.to_tuple (Box3.min box), V3.to_tuple (Box3.max box)
 
-  let cuboid_dups ?tr ?name spec = 
+  let cuboid_dups ?tr ?name box = 
     let attrs =
       let ba = Ba.create Ba.Float32 (8 * 3 * 3) in 
       let push = pusher Ba.set_3d ba in 
-      let (l, b, n), (r, t, f) = cuboid_extrema spec in
+      let (l, b, n), (r, t, f) = cuboid_extrema box in
       push l b n; push r b n; push r t n; push l t n; (* Near *)
       push l b n; push r b n; push r b f; push l b f; (* Bottom *)
       push l b n; push l b f; push l t f; push l t n; (* Left *)
@@ -119,11 +105,11 @@ module Prim = struct
     in
     Prim.create ?tr ?name ~index `Triangles attrs 
 
-  let cuboid_no_dups ?tr ?name spec = 
+  let cuboid_no_dups ?tr ?name box = 
     let attrs = 
       let ba = Ba.create Ba.Float32 (3 * 8) in 
       let push = pusher Ba.set_3d ba in
-      let (l, b, n), (r, t, f) = cuboid_extrema spec in
+      let (l, b, n), (r, t, f) = cuboid_extrema box in
       push l b n; push r b n; push l t n; push r t n; (* Near *)
       push l b f; push r b f; push l t f; push r t f; (* Far *) 
       [ Attr.create Attr.vertex ~dim:3 (Buf.create (`Float32 ba)) ]
@@ -144,7 +130,9 @@ module Prim = struct
   let cuboid ?tr ?name ?(dups = true) spec =
     if dups then cuboid_dups ?tr ?name spec else cuboid_no_dups ?tr ?name spec
 
-  let cube ?tr ?name ?dups s = cuboid ?tr ?name ?dups (`Size (Size3.v s s s))
+  let cube ?tr ?name ?dups s = 
+    let box = Box3.v_mid P3.o (Size3.v s s s) in 
+    cuboid ?tr ?name ?dups box
 
   (* Sphere *) 
 

@@ -21,7 +21,7 @@ let prim_cycler ?(normals = false) ?prims () =
       let with_normals p = if normals then Litu.Prim.with_normals p else p in
       [ lazy (with_normals (Litu.Prim.cube 1.)); 
         lazy (with_normals (Litu.Prim.sphere ~level:4 0.5)); 
-        lazy (with_normals (Litu.Prim.rect (`Size (Size2.v 1. 1.))));
+        lazy (with_normals (Litu.Prim.rect (Box2.v_mid P2.o (Size2.v 1. 1.))));
         lazy (with_normals (Bunny.create ~scale:1.5 ())) ]
   in
   let cycle = ref (prims ()) in

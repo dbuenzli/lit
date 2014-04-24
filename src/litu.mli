@@ -26,13 +26,9 @@ module Prim : sig
       {b Note.} All these primitives are [`Triangles] primitives. *)
 
   val rect : ?tr:m4 -> ?name:string -> ?tex:string -> ?segs:Size2.t -> 
-    ?d2:bool -> [ `Size of Size2.t | `Box of box2 ] -> prim
-  (** [rect tr name tex d2 segs spec] is an axis-aligned Oxy 2D plane 
-      specified according to [spec]:
-      {ul 
-      {- [`Size s], the plane has extents [s] and is centered
-         on the origin.}
-      {- [`Box b], the plane is bounded by [b].}}
+    ?d2:bool ->  box2 -> prim
+  (** [rect tr name tex d2 segs box] is an axis-aligned Oxy 2D plane 
+      bounded by [b]. 
 
       The plane is divided in [Size2.w segs] segments along the x-axis
       and [Size2.h segs] along the y-axis ([segs] defaults to
@@ -48,14 +44,8 @@ module Prim : sig
 
       [tr] and [name] are given to {!Lit.Prim.create}. *)
  
-  val cuboid : ?tr:m4 -> ?name:string -> ?dups:bool -> 
-    [ `Size of Gg.size3 | `Box of box3 ] -> prim
-  (** [cuboid tr dups spec] is an axis-aligned cuboid specified according to
-      [spec]:
-      {ul 
-      {- [`Size s], the cuboid has extents [s] and is centered
-         on the origin.}
-      {- [`Box b], the cuboid is bounded by [b].}}
+  val cuboid : ?tr:m4 -> ?name:string -> ?dups:bool -> box3 -> prim
+  (** [cuboid tr dups box] is an axis-aligned cuboid bounded by [box].
       If [dups] is [true] (default) vertices in the mesh are
       triplicated so that per vertex normal computation defines planar
       facets.
@@ -63,7 +53,8 @@ module Prim : sig
       [tr] and [name] are given to {!Lit.Prim.create}. *)
 
   val cube : ?tr:m4 -> ?name:string -> ?dups:bool -> float -> prim
-  (** [cube tr name dups s] is [cube tr name dups (`Size (Size3.v s s s))]. *)
+  (** [cube tr name dups s] is 
+      [cube tr name dups (Box3.v_mid P3.o (Size3.v s s s))]. *)
 
   val sphere : ?tr:m4 -> ?name:string -> ?level:int -> float -> prim
   (** [sphere tr name level r] is a sphere of radius [r] centered 

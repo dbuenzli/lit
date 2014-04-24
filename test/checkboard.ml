@@ -62,7 +62,7 @@ let effect = Effect.create program
 
 (* World *) 
 
-let prim = Litu.Prim.rect ~tex:"tex" (`Size (Size2.v 1. 1.))
+let prim = Litu.Prim.rect ~tex:"tex" (Box2.v_mid P2.o (Size2.v 1. 1.))
 let prim_tr =
   let z = -0.1 *. Float.pi in 
   let y = -0.05 *. Float.pi in
