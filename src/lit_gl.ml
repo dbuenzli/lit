@@ -133,6 +133,7 @@ type t =
     mutable size : size2;
     mutable view : view;
     mutable world_to_clip : m4 Lazy.t; (* cache *) 
+    mutable ops : op list; (* no sorting *) 
     mutable 
       batches : op list Imap.t; (* maps programs ids to rendering operations *) 
     }
@@ -1362,6 +1363,15 @@ let render_op r prog_binfo op =
       then Gl.draw_elements mode count type_ first
       else Gl.draw_elements_instanced mode count type_ first op.count
           
+let render_ops r =
+  let render o = 
+    let info = BProg.get_binfo (Effect.prog o.effect) in 
+    BProg.use r info.BProg.id;
+    render_op r info o 
+  in 
+  List.iter render (List.rev r.ops);
+  r.ops <- []
+      
 let render_batch r id batch =
   let prog_binfo = BProg.get_binfo (Effect.prog (List.hd batch).effect) in
   BProg.use r id; List.iter (render_op r prog_binfo) batch
@@ -1394,6 +1404,7 @@ let create ?compiler_msg_parser log ~debug size =
             size; 
             view = View.create ();
             world_to_clip = lazy M4.id;
+            ops = [];
             batches = Imap.empty; 
              }
   in
@@ -1412,12 +1423,14 @@ let set_fbuf r fbuf =
   Gl.bind_framebuffer Gl.framebuffer id; 
   r.fbuf <- fbuf
 
-
-let add_op r op =  match BProg.setup r (Effect.prog op.effect) with 
+let add_op r op = match BProg.setup r (Effect.prog op.effect) with 
 | `Error -> ()
 | `Ok prog_id -> 
+    r.ops <- op :: r.ops;
+(* 
     let batches = try Imap.find prog_id r.batches with Not_found -> [] in
     r.batches <- Imap.add prog_id (op :: batches) r.batches; 
+*)
     BPrim.setup r op.prim
 
 let cleanup r =         
@@ -1427,9 +1440,12 @@ let cleanup r =
 let render r ~clear =
   if not (r.cleanups = []) then cleanup r; 
   setup_framebuffer r clear;
+  render_ops r;
+(*
   let batches = r.batches in 
   r.batches <- Imap.empty;
   Imap.iter (render_batch r) batches;
+*)
   Gl_hi.check_error ();
   ()
   
