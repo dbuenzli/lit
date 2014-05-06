@@ -1197,6 +1197,8 @@ module BFbuf = struct
     | `Stencil i -> attach Gl.stencil i
 
   let rec setup r fb = 
+    (* TODO it seems that sometimes the default fb is not 0. 
+       http://lists.libsdl.org/pipermail/sdl-libsdl.org/2014-May/471372.html *) 
     if fb == Fbuf.default then 0 else
     match binfo fb with 
     | Some binfo -> binfo.id
@@ -1221,7 +1223,7 @@ module BFbuf = struct
         Gl.framebuffer_incomplete_multisample, `Incomplete_multisample; 
         Gl.framebuffer_incomplete_layer_targets, `Incomplete_layer_targets; ]
      
-  let raw_clear clears = 
+  let raw_clear r clears = 
     let clear_mask = ref 0 in
     begin match clears.Fbuf.clear_color with 
     | None -> () 
@@ -1232,7 +1234,11 @@ module BFbuf = struct
     begin match clears.Fbuf.clear_depth with 
     | None -> () 
     | Some d -> 
-        Gl.clear_depth 1.; 
+        (* TODO do that better.
+           Effects may have set that to [false] we need to make it 
+           true before clearing and set it back. *) 
+        Gl.depth_mask true; 
+        Gl.clear_depth d; 
         clear_mask := Gl.(!clear_mask + depth_buffer_bit)
     end;
     begin match clears.Fbuf.clear_stencil with
@@ -1241,12 +1247,14 @@ module BFbuf = struct
         Gl.clear_stencil s; 
         clear_mask := Gl.(!clear_mask + stencil_buffer_bit)
     end;
-    if !clear_mask <> 0 then Gl.clear !clear_mask
+    if !clear_mask <> 0 then Gl.clear !clear_mask; 
+    Gl.depth_mask r.depth.Effect.depth_write; (* TODO do that better *) 
+    ()
 
   let clear r fb =
     let id = setup r fb in
     Gl.bind_framebuffer Gl.framebuffer id; 
-    raw_clear (Fbuf.clears fb); 
+    raw_clear r (Fbuf.clears fb); 
     Gl.bind_framebuffer Gl.framebuffer 0
 
   let status r fb =
@@ -1336,7 +1344,7 @@ let setup_framebuffer r clear =
   Gl.viewport ox oy w h; 
   Gl.scissor ox oy w h;
   Gl.bind_framebuffer Gl.framebuffer (BFbuf.setup r r.fbuf);
-  if clear then BFbuf.raw_clear (Fbuf.clears r.fbuf);
+  if clear then BFbuf.raw_clear r (Fbuf.clears r.fbuf);
   ()
 
 let render_op r prog_binfo op = 
