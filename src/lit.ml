@@ -1256,7 +1256,7 @@ module View = struct
     in
     Gg.M4.persp 
       ~left:(-.half_w) ~right:(half_w)
-      ~bottom:(-.half_h) ~top:(half_h)
+      ~bot:(-.half_h) ~top:(half_h)
       ~near ~far
 
   let look ?(up = V3.oy) ~at ~from:pos () = 
