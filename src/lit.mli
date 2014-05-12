@@ -1068,11 +1068,8 @@ module View : sig
       }} *)
 
   val tr : view -> m4 
-  val set_tr : view -> m4 -> unit
   val proj : view -> m4 
-  val set_proj : view -> m4 -> unit
   val viewport : view -> box2 
-  val set_viewport : view -> box2 -> unit 
     
   (** {1 Coordinate system transforms} 
       

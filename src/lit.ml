@@ -313,7 +313,7 @@ type effect = Effect_types.t
 (* Views *) 
 
 module View_types = struct
-  type t = { mutable tr : m4; mutable proj : m4; mutable viewport : box2 }
+  type t = { tr : m4; proj : m4; viewport : box2 }
 end
 
 type view = View_types.t 
@@ -1275,11 +1275,8 @@ module View = struct
       ?(viewport = Box2.unit) () = { tr; proj; viewport }
   
   let tr v = v.tr
-  let set_tr v m = v.tr <- m
   let proj v = v.proj
-  let set_proj v m = v.proj <- m
-  let viewport v = v.viewport 
-  let set_viewport v b = v.viewport <- b
+  let viewport v = v.viewport
 
   (* Coordinate system transforms *) 
       
