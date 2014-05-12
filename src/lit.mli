@@ -1049,9 +1049,12 @@ module View : sig
   type t = view
   (** The type for views. *)
 
-  val create : ?tr:m4 -> ?proj:m4 -> ?viewport:box2  -> unit  -> t
-  (** [create tr proj viewport] is a view such that: 
+  val create : ?src:view -> ?tr:m4 -> ?proj:m4 -> ?viewport:box2  -> 
+    unit  -> t
+  (** [create src tr proj viewport ()] is a view such that: 
       {ul 
+      {- [src], if present default values are taken from 
+         this view rather than the values specified below.} 
       {- [tr], defines the location and orientation of the view.
          It is the transform that maps world coordinates to view 
          coordinates. Defaults to {!M4.id}, i.e. we are at the origin

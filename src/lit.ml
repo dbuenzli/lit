@@ -1271,9 +1271,19 @@ module View = struct
 
   (* View *) 
 
-  let create ?(tr = M4.id) ?(proj = persp (`H Float.pi_div_4) 1.5 1. 100.) 
-      ?(viewport = Box2.unit) () = { tr; proj; viewport }
-  
+  let default = { tr = M4.id; proj = persp (`H Float.pi_div_4) 1.5 1. 100.; 
+                  viewport = Box2.unit }
+                
+  let create ?src ?tr ?proj ?viewport () =
+    let default = match src with None -> default | Some src -> src in
+    let tr = match tr with None -> default.tr | Some tr -> tr in 
+    let proj = match proj with None -> default.proj | Some proj -> proj in 
+    let viewport = match viewport with 
+    | None -> default.viewport 
+    | Some viewport -> viewport 
+    in
+    { tr; proj; viewport }
+    
   let tr v = v.tr
   let proj v = v.proj
   let viewport v = v.viewport
