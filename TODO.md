@@ -1,3 +1,7 @@
+
+* Port all examples to useri and get rid of test/dapp.{.ml,mli}
+
+* Use __LOC__ __FILE__ identifiers (4.02). 
 * `Buf.gpu_map_buffer : ... buf -> Gg.buffer` 
 * `Lig_gl` raster, depth, blend state setup, compare with 
    the old value before submitting GL calls.

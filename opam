@@ -1,19 +1,23 @@
-opam-version: "1"
+opam-version: "1.2"
 maintainer: "Daniel Bünzli <daniel.buenzl i@erratique.ch>"
-homepage: "http://erratique.ch/software/lit"
 authors: ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"]
+homepage: "http://erratique.ch/software/lit"
 doc: "http://erratique.ch/software/lit/doc/Lit"
-tags: [ "opengl" "opengl-es" "webgl" "graphics" ]
-license: "BSD3"
-ocaml-version: [>= "4.00.0"]
-depends: [ "ocamlfind" "gg" ]
-depopts: [ "tgls" "js_of_ocaml"  ]
-build:
-[
-  [ "ocaml" "pkg/git.ml" ]
-  [ "ocaml" "pkg/build.ml" "native=%{ocaml-native}%" 
-                           "native-dynlink=%{ocaml-native}%" # TODO change
-                           "tgls=%{tgls:installed}%" 
-                           "jsoo=%{js_of_ocaml:installed}%" ]
+dev-repo: "http://erratique.ch/repos/lit.git"
+bug-reports: "https://github.com/dbuenzli/lit/issues"
+tags: [ "opengl" "opengl-es" "webgl" "graphics" "org:erratique" ]
+license: "ISC"
+available: [ ocaml-version >= "4.01.0"]
+depends: [
+ "ocamlfind" {build}
+ "ocamlbuild" {build}
+ "topkg" {build & >= "0.8.1"}
+ "useri" {test}
+ "gg"
 ]
-
+depopts: [ "tgls" "js_of_ocaml"  ]
+build:[[
+  "ocaml" "pkg/pkg.ml" "build"
+  "--pinned" "%{pinned}%"
+  "--with-tgls" "%{tgls:installed}%"
+  "--with-js_of_ocaml" "%{js_of_ocaml:installed}%"]]

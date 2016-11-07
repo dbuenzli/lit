@@ -1,4 +1,4 @@
-<**/*.{mli,ml}> : bin_annot, annot, debug, thread
+<**/*.{mli,ml}> : bin_annot, annot, debug, thread, safe_string
 <tsdl> : include
 <src> : include
 <test> : include
@@ -12,5 +12,7 @@
 <src/lit_webgl.{mli,ml}> : package(gg), package(js_of_ocaml.syntax), \
                            syntax(camlp4o)
 
-<test/**/*.{mli,ml,byte,native}> : package(gg), package(ctypes),\
-                                   package(tsdl), package(tgls.tgl3)
+<test/**/*.{mli,ml,byte,native}> : thread, package(gg), \
+                                   package(useri.tsdl), \
+                                   package(useri), \
+                                   package(tgls.tgl3)

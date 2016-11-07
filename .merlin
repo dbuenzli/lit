@@ -1,0 +1,5 @@
+EXT js
+PKG gg tgls useri js_of_ocaml tsdl react
+B _build/**
+SRC src
+SRC test

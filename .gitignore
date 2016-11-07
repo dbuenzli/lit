@@ -1,11 +1,9 @@
 _build
 tmp
-dist
-test/sinex.ml
 *~
 \.\#*
 \#*#
 *.native
 *.byte
+*.install
 .DS_Store
-CLOCK.org

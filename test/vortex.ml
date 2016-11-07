@@ -1,48 +1,53 @@
 (*---------------------------------------------------------------------------
    Copyright (c) 2014 Daniel C. Bünzli. All rights reserved.
-   Distributed under the BSD3 license, see license at the end of the file.
-   %%NAME%% release %%VERSION%%
+   Distributed under the ISC license, see terms at the end of the file.
+   %%NAME%% %%VERSION%%
   ---------------------------------------------------------------------------*)
 
-(* Animated vortex. 
+(* Animated vortex.
 
    Pixel shader due to http://badc0de.jiggawatt.org
-   Used with permission. *)
+   Used with permission.
+
+   Compile with
+   ocamlfind ocamlopt -package tgls.tgl3,lit.gl,useri.tsdl,useri -linkpkg \
+      vortex.ml -o vortex.native *)
 
 open Gg
 open Lit
+open React
+open Useri
 
-let fullscreen () = (* two triangles covering the projection of clip space *) 
-  let attrs =                                    
-    let b = Ba.create Ba.Float32 (4 * 3) in 
+let fullscreen () = (* two triangles covering the projection of clip space *)
+  let attrs =
+    let b = Ba.create Ba.Float32 (4 * 3) in
     Ba.set_3d b 0 ( 1.) ( 1.) ( 0.);                 (* vertices *)
     Ba.set_3d b 3 (-1.) ( 1.) ( 0.);
     Ba.set_3d b 6 ( 1.) (-1.) ( 0.);
     Ba.set_3d b 9 (-1.) (-1.) ( 0.);
     let b = Buf.create (`Float32 b) in
     [ Attr.create Attr.vertex ~dim:3 b ]
-  in 
-  let index =                                            
-    let b = Ba.create Ba.UInt8 (2 * 3) in 
+  in
+  let index =
+    let b = Ba.create Ba.UInt8 (2 * 3) in
     Ba.set_3d b 0 0 1 2;                           (* triangles *)
     Ba.set_3d b 3 2 1 3;
-    Buf.create (`UInt8 b) 
+    Buf.create (`UInt8 b)
   in
   Prim.create ~index `Triangles attrs
 
 let time = Uniform.float "time" 0.
-let program = 
+let program =
   let uset = Uniform.(empty + viewport_size "view_size" + time) in
   Prog.create ~uset [
     Prog.shader `Vertex "
     in vec3 vertex;
     void main() { gl_Position = vec4(vertex, 1.0); }";
-
     Prog.shader `Fragment "
     uniform vec2 view_size;
     uniform float time;
     out vec4 color;
-    void main() 
+    void main()
     {
       float time = 2 * time;
       vec2 p = -1.0 + 2.0 * gl_FragCoord.xy / view_size.xy;
@@ -73,66 +78,58 @@ let program =
     }"
   ]
 
-let effect = Effect.create program 
+let effect = Effect.create program
 let op = Renderer.op effect (fullscreen ())
 
-(* Render *) 
-         
-let draw r = 
-  Renderer.add_op r op; 
-  Renderer.render r
-    
-let command r app = function
-| `Init -> Demo.show_start r; `Ok 
-| `Exit -> Renderer.release r; Demo.show_stop (); `Quit
-| `Resize size -> Renderer.set_size r size; `Ok 
-| `Toggle_fullscreen -> App.toggle_fullscreen app; `Ok 
-| `Tick now ->
-    Effect.set_uniform op.effect time now;
-    Demo.show_stats now draw r App.update_surface app;
-    `Ok
-| _ -> `Ok 
+(* Render *)
 
-let main () = 
-  let size = Demo.default_size in
-  let app = App.create { App.default with App.size = size; 
-                                          hidpi = true; tick_hz = 60; } in
-  let r = Renderer.create ~size (App.select_backend ()) in
-  let ev = Demo.ev_of_command_handler (command r) in
-  App.handle_run app ~ev
-  
+let render r _ =
+  Effect.set_uniform op.effect time (Time.elapsed ());
+  Renderer.add_op r op;
+  Renderer.render r;
+  Surface.update ();
+  ()
+
+(* Setup *)
+
+let setup size =
+  let s = S.value size in
+  let r = Renderer.create ~size:s (module Lit_gl : Lit.Renderer.T) in
+  let resize = S.l1 (Renderer.set_size r) size in
+  let draw = E.map (render r) Surface.refresh in
+  App.sink_event draw;
+  App.sink_signal resize;
+  Surface.steady_refresh ~until:E.never;
+  r
+
+let main () =
+  let hidpi = App.env "HIDPI" ~default:true bool_of_string in
+  let size = Size2.v 600. 400. in
+  let surface = Surface.create ~hidpi ~size () in
+  let mode_set = Surface.mode_flip (Key.up `Space) in
+  Surface.set_mode_setter mode_set;
+  match App.init ~surface () with
+  | Error (`Msg e) -> Printf.eprintf "%s" e; exit 1
+  | Ok () ->
+      let r = setup Surface.raster_size in
+      App.run ~until:App.quit ();
+      Renderer.release r;
+      exit 0
+
 let () = main ()
 
-
 (*---------------------------------------------------------------------------
-   Copyright (c) 2014 Daniel C. Bünzli.
-   All rights reserved.
+   Copyright (c) 2014 Daniel C. Bünzli
 
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions
-   are met:
-     
-   1. Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
+   Permission to use, copy, modify, and/or distribute this software for any
+   purpose with or without fee is hereby granted, provided that the above
+   copyright notice and this permission notice appear in all copies.
 
-   2. Redistributions in binary form must reproduce the above
-      copyright notice, this list of conditions and the following
-      disclaimer in the documentation and/or other materials provided
-      with the distribution.
-
-   3. Neither the name of Daniel C. Bünzli nor the names of
-      contributors may be used to endorse or promote products derived
-      from this software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
   ---------------------------------------------------------------------------*)
