@@ -14,8 +14,14 @@ depends: [
  "topkg" {build & >= "0.8.1"}
  "useri" {test}
  "gg"
+
+ # Should be depopted
+ "js_of_ocaml" {>= "3.0"}
+ "js_of_ocaml-compiler" {>= "3.0"}
+ "js_of_ocaml-ocamlbuild" {>= "3.0"}
+ "js_of_ocaml-ppx" {>= "3.0"}
 ]
-depopts: [ "tgls" "js_of_ocaml"  ]
+depopts: [ "tgls" ]
 build:[[
   "ocaml" "pkg/pkg.ml" "build"
   "--pinned" "%{pinned}%"
